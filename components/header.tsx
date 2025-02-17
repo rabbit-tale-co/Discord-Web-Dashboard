@@ -129,9 +129,9 @@ export const Header = () => {
 	});
 
 	const contentRef = useRef<HTMLDivElement>(null);
-	const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	const botName = process.env.NEXT_PUBLIC_BOT_NAME;
+	const botName = process.env.NEXT_PUBLIC_BOT_NAME || "";
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -238,18 +238,6 @@ export const Header = () => {
 
 	useEffect(() => {
 		if (activeNav?.features) {
-			// const initialSizes: { [key: string]: { width: number; height: number } } =
-			// 	{
-			// 		Features: { width: 800, height: 300 },
-			// 		Solutions: { width: 600, height: 280 },
-			// 		Documentation: { width: 400, height: 320 },
-			// 		Plugins: { width: 300, height: 250 },
-			// 	}
-
-			// setContentDimensions(
-			// 	initialSizes[activeNav.name] || { width: 300, height: 200 }
-			// )
-
 			requestAnimationFrame(() => {
 				requestAnimationFrame(() => {
 					requestAnimationFrame(() => {
@@ -376,9 +364,9 @@ export const Header = () => {
 						{navigationItems.map((item, index) => (
 							<Button
 								key={item.name}
-								size="lg"
-								variant="ghost"
-								className="relative"
+								size={"lg"}
+								variant={"link"}
+								className="relative rounded-full"
 								data-nav-item={index}
 								tabIndex={0}
 								onMouseEnter={() => handleNavEnter(item)}
@@ -400,7 +388,7 @@ export const Header = () => {
 								className="focus:outline-none hover:bg-neutral-800 focus:bg-neutral-800"
 							>
 								Get Premium
-								<SolidLogo size={22} />
+								<SolidLogo size={20} />
 							</Link>
 						</Button>
 						<Button asChild size="lg" variant="default">
@@ -409,7 +397,7 @@ export const Header = () => {
 								className="focus:outline-none hover:bg-[#5865F2]/90 focus:bg-[#5865F2]/90"
 							>
 								Login
-								<SolidLogo size={22} />
+								<SolidLogo size={20} />
 							</Link>
 						</Button>
 					</div>
@@ -461,7 +449,7 @@ export const Header = () => {
 														<div className="relative *:h-10 *:w-9 *:rounded-lg *:transition-transform *:duration-200 *:ease-bigBounce">
 															<div className="absolute left-1.5 top-0 rotate-[16deg] bg-neutral-400 group-hover:-translate-x-1 group-hover:-rotate-[8deg] group-focus:-translate-x-1 group-focus:-rotate-[8deg]" />
 															<div className="relative flex items-center justify-center bg-neutral-100 text-neutral-700 group-hover:translate-x-1.5 group-hover:rotate-[16deg] group-focus:translate-x-1.5 group-focus:rotate-[16deg]">
-																<SolidLogo size={22} />
+																<SolidLogo size={20} />
 															</div>
 														</div>
 														<div>
@@ -483,7 +471,7 @@ export const Header = () => {
 													key={feature.title}
 													href={feature.path || ""}
 													className={
-														"group relative flex min-h-[264px] w-[220px] items-center overflow-hidden rounded-lg bg-neutral-900 hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary"
+														"group relative flex min-h-[264px] w-[200px] items-center overflow-hidden rounded-lg bg-neutral-900 hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary"
 													}
 													data-menu-item={
 														index + (activeNav?.features?.slice(4).length || 0)
@@ -513,11 +501,11 @@ export const Header = () => {
 													<div className="absolute bottom-2 right-2 z-10 flex size-8 items-center justify-center rounded-full bg-white/10 text-neutral-100 opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100">
 														<span className="relative flex size-5 items-center justify-center overflow-hidden *:transition-transform *:duration-[400ms] *:ease-bounce group-focus:*:translate-x-0">
 															<SolidArrowRight
-																size={20}
+																size={22}
 																className="absolute -translate-x-5 group-active:translate-x-0 group-hover:translate-x-0 group-focus:translate-x-0 group-focus-visible:translate-x-0 rotate-0"
 															/>
 															<SolidArrowRight
-																size={20}
+																size={22}
 																className="group-active:translate-x-5 group-hover:translate-x-5 group-focus:translate-x-5 group-focus-visible:translate-x-5 rotate-0"
 															/>
 														</span>
@@ -557,11 +545,11 @@ export const Header = () => {
 												<div className="absolute bottom-2 right-2 z-10 flex size-8 items-center justify-center rounded-full bg-white/10 text-neutral-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus:opacity-100">
 													<span className="relative flex size-5 items-center justify-center overflow-hidden *:transition-transform *:duration-[400ms] *:ease-bounce">
 														<SolidArrowRight
-															size={20}
+															size={22}
 															className="absolute -translate-x-5 group-active:translate-x-0 sm:group-hover:translate-x-0 sm:group-focus:translate-x-0 group-focus-visible:translate-x-0 rotate-0"
 														/>
 														<SolidArrowRight
-															size={20}
+															size={22}
 															className="group-active:translate-x-5 sm:group-hover:translate-x-5 group-focus-visible:translate-x-5 rotate-0"
 														/>
 													</span>
@@ -598,11 +586,11 @@ export const Header = () => {
 											<div className="absolute bottom-2 right-2 z-10 flex size-8 items-center justify-center rounded-full bg-white/10 text-neutral-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
 												<span className="relative flex size-5 items-center justify-center overflow-hidden *:transition-transform *:duration-[400ms] *:ease-bounce">
 													<SolidArrowRight
-														size={20}
+														size={22}
 														className="absolute -translate-x-5 group-active:translate-x-0 sm:group-hover:translate-x-0 sm:group-focus:translate-x-0 group-focus-visible:translate-x-0 rotate-0"
 													/>
 													<SolidArrowRight
-														size={20}
+														size={22}
 														className="group-active:translate-x-5 sm:group-hover:translate-x-5 group-focus-visible:translate-x-5 rotate-0"
 													/>
 												</span>
@@ -636,11 +624,11 @@ export const Header = () => {
 													<div className="absolute bottom-2 right-2 z-10 flex size-8 items-center justify-center rounded-full bg-white/10 text-neutral-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
 														<span className="relative flex size-5 items-center justify-center overflow-hidden *:transition-transform *:duration-[400ms] *:ease-bounce">
 															<SolidArrowRight
-																size={20}
+																size={22}
 																className="absolute -translate-x-5 group-active:translate-x-0 sm:group-hover:translate-x-0 sm:group-focus:translate-x-0 group-focus-visible:translate-x-0 rotate-0"
 															/>
 															<SolidArrowRight
-																size={20}
+																size={22}
 																className="group-active:translate-x-5 sm:group-hover:translate-x-5 group-focus-visible:translate-x-5 rotate-0"
 															/>
 														</span>
@@ -658,7 +646,7 @@ export const Header = () => {
 													<div className="relative *:h-10 *:w-9 *:rounded-lg *:transition-transform *:duration-200 *:ease-bigBounce">
 														<div className="absolute left-1.5 top-0 rotate-[16deg] bg-neutral-400 group-hover:-translate-x-1 group-hover:-rotate-[8deg] group-focus:-translate-x-1 group-focus:-rotate-[8deg]" />
 														<div className="relative flex items-center justify-center bg-neutral-100 text-neutral-700 group-hover:translate-x-1.5 group-hover:rotate-[16deg] group-focus:translate-x-1.5 group-focus:rotate-[16deg]">
-															<SolidLogo size={22} />
+															<SolidLogo size={20} />
 														</div>
 													</div>
 													<div>
@@ -687,7 +675,7 @@ export const Header = () => {
 													<div className="relative *:h-10 *:w-9 *:rounded-lg *:transition-transform *:duration-200 *:ease-bigBounce">
 														<div className="absolute left-1.5 top-0 rotate-[16deg] bg-neutral-400 group-hover:-translate-x-1 group-hover:-rotate-[8deg] group:focus .relative *:first-child" />
 														<div className="relative flex items-center justify-center bg-neutral-100 text-neutral-700 group-hover:translate-x-1.5 group-focus:translate-x-1.5 group-hover:rotate-[16deg] group-focus:rotate-[16deg]">
-															<SolidLogo size={22} />
+															<SolidLogo size={20} />
 														</div>
 													</div>
 													<div>
