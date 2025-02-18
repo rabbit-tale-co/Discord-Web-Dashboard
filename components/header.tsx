@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SolidArrowRight, SolidLogo } from "@/components/icons";
 import Image from "next/image";
+import { SolidDiscord } from "./icons/assets/socials/discord";
 
 type NavItem = {
 	name: string;
@@ -27,13 +28,13 @@ const navigationItems: NavItem[] = [
 				title: "Analytics Dashboard",
 				description: "Track your server's growth and engagement",
 				path: "/features/analytics",
-				image: "/images/analytics.jpg",
+				// image: "/images/analytics.jpg",
 			},
 			{
 				title: "Server Insights",
 				description: "Get detailed insights about your community",
 				path: "/features/insights",
-				image: "/images/insights.jpg",
+				// image: "/images/insights.jpg",
 			},
 			{
 				title: "Integration Hub",
@@ -342,13 +343,81 @@ export const Header = () => {
 
 	return (
 		<header className="fixed w-full top-0 pt-4 z-50">
-			<div
-				className={`pointer-events-none absolute left-0 top-0 h-screen w-full select-none bg-black/10 backdrop-blur-sm transition-opacity duration-500 ease-out ${
-					activeNav?.features ? "opacity-100 visible" : "opacity-0"
-				}`}
-			/>
+			{/* Progressive Blur Overlay */}
+			<div className="absolute inset-0  pointer-events-none transform scale-y-[-1]">
+				{/* Layer 1 (backdrop-blur-[1px]) – oryginalne: 0, 12.5, 25, 37.5 */}
+				<div
+					className="absolute inset-0 z-[1] backdrop-blur-[1px]"
+					style={{
+						WebkitMaskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 6.25%, rgba(0,0,0,1) 12.5%, rgba(0,0,0,0) 18.75%)",
+						maskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 6.25%, rgba(0,0,0,1) 12.5%, rgba(0,0,0,0) 18.75%)",
+					}}
+				/>
+				{/* Layer 2 (backdrop-blur-[2px]) – oryginalne: 12.5, 25, 37.5, 50 */}
+				<div
+					className="absolute inset-0 z-[2] backdrop-blur-[2px]"
+					style={{
+						WebkitMaskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 6.25%, rgba(0,0,0,1) 12.5%, rgba(0,0,0,1) 18.75%, rgba(0,0,0,0) 25%)",
+						maskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 6.25%, rgba(0,0,0,1) 12.5%, rgba(0,0,0,1) 18.75%, rgba(0,0,0,0) 25%)",
+					}}
+				/>
+				{/* Layer 3 (backdrop-blur-[4px]) – oryginalne: 25, 37.5, 50, 62.5 */}
+				<div
+					className="absolute inset-0 z-[3] backdrop-blur-[4px]"
+					style={{
+						WebkitMaskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 12.5%, rgba(0,0,0,1) 18.75%, rgba(0,0,0,1) 25%, rgba(0,0,0,0) 31.25%)",
+						maskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 12.5%, rgba(0,0,0,1) 18.75%, rgba(0,0,0,1) 25%, rgba(0,0,0,0) 31.25%)",
+					}}
+				/>
+				{/* Layer 4 (backdrop-blur-[8px]) – oryginalne: 37.5, 50, 62.5, 75 */}
+				<div
+					className="absolute inset-0 z-[4] backdrop-blur-[8px]"
+					style={{
+						WebkitMaskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 18.75%, rgba(0,0,0,1) 25%, rgba(0,0,0,1) 31.25%, rgba(0,0,0,0) 37.5%)",
+						maskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 18.75%, rgba(0,0,0,1) 25%, rgba(0,0,0,1) 31.25%, rgba(0,0,0,0) 37.5%)",
+					}}
+				/>
+				{/* Layer 5 (backdrop-blur-[16px]) – oryginalne: 50, 62.5, 75, 87.5 */}
+				<div
+					className="absolute inset-0 z-[5] backdrop-blur-[16px]"
+					style={{
+						WebkitMaskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 25%, rgba(0,0,0,1) 31.25%, rgba(0,0,0,1) 37.5%, rgba(0,0,0,0) 43.75%)",
+						maskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 25%, rgba(0,0,0,1) 31.25%, rgba(0,0,0,1) 37.5%, rgba(0,0,0,0) 43.75%)",
+					}}
+				/>
+				{/* Layer 6 (backdrop-blur-[32px]) – oryginalne: 62.5, 75, 87.5 */}
+				<div
+					className="absolute inset-0 z-[6] backdrop-blur-[32px]"
+					style={{
+						WebkitMaskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 31.25%, rgba(0,0,0,1) 37.5%, rgba(0,0,0,1) 43.75%)",
+						maskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 31.25%, rgba(0,0,0,1) 37.5%, rgba(0,0,0,1) 43.75%)",
+					}}
+				/>
+				{/* Layer 7 (backdrop-blur-[64px]) – oryginalne: 75, 87.5 */}
+				<div
+					className="absolute inset-0 z-[7] backdrop-blur-[64px]"
+					style={{
+						WebkitMaskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 37.5%, rgba(0,0,0,1) 43.75%)",
+						maskImage:
+							"linear-gradient(to bottom, rgba(0,0,0,0) 37.5%, rgba(0,0,0,1) 43.75%)",
+					}}
+				/>
+			</div>
 
-			<div className="container mx-auto relative z-40">
+			<div className="container max-w-7xl mx-auto relative z-40">
 				<nav className="flex items-center justify-between h-16">
 					<div className="flex items-center">
 						<Link
@@ -366,7 +435,7 @@ export const Header = () => {
 								key={item.name}
 								size={"lg"}
 								variant={"link"}
-								className="relative rounded-full"
+								className="relative rounded-full px-4"
 								data-nav-item={index}
 								tabIndex={0}
 								onMouseEnter={() => handleNavEnter(item)}
@@ -382,22 +451,27 @@ export const Header = () => {
 					</div>
 
 					<div className="flex items-center space-x-3">
-						<Button asChild size="lg">
+						<Button asChild size="lg" className="rounded-full">
 							<Link
 								href="/premium"
 								className="focus:outline-none hover:bg-neutral-800 focus:bg-neutral-800"
 							>
 								Get Premium
-								<SolidLogo size={20} />
+								<SolidLogo size={22} />
 							</Link>
 						</Button>
-						<Button asChild size="lg" variant="default">
+						<Button
+							asChild
+							size="lg"
+							variant="discord"
+							className="rounded-full"
+						>
 							<Link
 								href="/login"
 								className="focus:outline-none hover:bg-[#5865F2]/90 focus:bg-[#5865F2]/90"
 							>
 								Login
-								<SolidLogo size={20} />
+								<SolidDiscord size={22} />
 							</Link>
 						</Button>
 					</div>
@@ -434,7 +508,7 @@ export const Header = () => {
 								{activeNav.name === "Features" && (
 									<header className="fade flex gap-2 animate-fadeSm">
 										<ul className="flex w-full max-w-[280px] flex-col gap-2">
-											{activeNav.features.slice(4).map((feature, index) => (
+											{activeNav.features.slice(3).map((feature, index) => (
 												<li key={feature.title}>
 													<Link
 														href={feature.path || ""}
@@ -466,12 +540,12 @@ export const Header = () => {
 										</ul>
 
 										<div className="flex gap-2">
-											{activeNav.features.slice(0, 3).map((feature, index) => (
+											{activeNav.features.slice(0, 2).map((feature, index) => (
 												<Link
 													key={feature.title}
 													href={feature.path || ""}
 													className={
-														"group relative flex min-h-[264px] w-[200px] items-center overflow-hidden rounded-lg bg-neutral-900 hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary"
+														"group relative flex min-h-[264px] w-[280px] items-center overflow-hidden rounded-lg bg-neutral-900 hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary"
 													}
 													data-menu-item={
 														index + (activeNav?.features?.slice(4).length || 0)
@@ -480,12 +554,21 @@ export const Header = () => {
 													data-feature-index={index}
 												>
 													<div className="absolute inset-0 opacity-70 transition-transform duration-400 ease-out group-hover:scale-105 group-hover:opacity-100 group-focus:scale-105 group-focus:opacity-100">
-														<Image
-															src={feature.image || "/placeholder.svg"}
-															alt={feature.title}
-															layout="fill"
-															objectFit="cover"
-														/>
+														{feature.image ? (
+															<Image
+																src={feature.image || "/placeholder.svg"}
+																alt={feature.title}
+																layout="fill"
+																objectFit="cover"
+															/>
+														) : (
+															<div className="flex h-full items-center justify-center">
+																<SolidLogo
+																	size={280}
+																	className="text-secondary-foreground"
+																/>
+															</div>
+														)}
 													</div>
 													<div
 														className="z-10 w-full self-end bg-gradient-to-t from-neutral-900 to-neutral-900/0 p-2.5 pr-11 pt-8"
@@ -646,7 +729,11 @@ export const Header = () => {
 													<div className="relative *:h-10 *:w-9 *:rounded-lg *:transition-transform *:duration-200 *:ease-bigBounce">
 														<div className="absolute left-1.5 top-0 rotate-[16deg] bg-neutral-400 group-hover:-translate-x-1 group-hover:-rotate-[8deg] group-focus:-translate-x-1 group-focus:-rotate-[8deg]" />
 														<div className="relative flex items-center justify-center bg-neutral-100 text-neutral-700 group-hover:translate-x-1.5 group-hover:rotate-[16deg] group-focus:translate-x-1.5 group-focus:rotate-[16deg]">
-															<SolidLogo size={20} />
+															{activeNav.features[1].icon ? (
+																<SolidLogo size={20} />
+															) : (
+																<SolidLogo size={20} />
+															)}
 														</div>
 													</div>
 													<div>
