@@ -1,6 +1,6 @@
 // ExpandedMenu.tsx
 import type React from "react";
-import { useRef, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { type Feature, FeatureCard } from "./feature-card";
 
 interface ExpandedMenuProps {
@@ -14,7 +14,6 @@ interface ExpandedMenuProps {
 }
 
 export const ExpandedMenu: React.FC<ExpandedMenuProps> = ({
-	activeNavName,
 	features,
 	isInExpandedMenu,
 	focusedMenuIndex,
@@ -28,14 +27,15 @@ export const ExpandedMenu: React.FC<ExpandedMenuProps> = ({
 	});
 
 	useEffect(() => {
-		if (contentRef.current) {
-			const rect = contentRef.current.getBoundingClientRect();
-			setContentDimensions({
-				width: Math.round(rect.width),
-				height: Math.round(rect.height),
-			});
-		}
-	}, [features, contentRef]);
+		const current = contentRef.current;
+		if (!current) return;
+
+		const rect = current.getBoundingClientRect();
+		setContentDimensions({
+			width: Math.round(rect.width),
+			height: Math.round(rect.height),
+		});
+	}, [contentRef]);
 
 	return (
 		<div

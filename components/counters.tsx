@@ -27,6 +27,9 @@ export const Counters = () => {
 	const hasAnimated = useRef(false);
 
 	useEffect(() => {
+		const current = countersRef.current;
+		if (!current) return;
+
 		const observer = new IntersectionObserver(
 			(entries) => {
 				for (const entry of entries) {
@@ -59,13 +62,11 @@ export const Counters = () => {
 			},
 		);
 
-		if (countersRef.current) {
-			observer.observe(countersRef.current);
-		}
+		observer.observe(current);
 
 		return () => {
-			if (countersRef.current) {
-				observer.unobserve(countersRef.current);
+			if (current) {
+				observer.unobserve(current);
 			}
 		};
 	}, []);

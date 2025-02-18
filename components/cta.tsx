@@ -1,6 +1,6 @@
 import { Button } from "./ui/button";
 import Link from "next/link";
-import { SolidDiscord, SolidLogo } from "./icons";
+import { SolidLogo } from "./icons";
 
 export function CTA() {
 	return (

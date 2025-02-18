@@ -133,6 +133,68 @@ export const Header = () => {
 
 	const botName = process.env.NEXT_PUBLIC_BOT_NAME || "";
 
+	// State to manage theme inversion
+	const [isDark, setIsDark] = useState(false);
+
+	useEffect(() => {
+		// Select trigger elements by their IDs
+		const darkTrigger = document.getElementById("dark-trigger");
+		const lightTrigger = document.getElementById("light-trigger");
+		const lightTrigger2 = document.getElementById("light-trigger-2");
+
+		if (!darkTrigger || !lightTrigger || !lightTrigger2) return;
+
+		const header = document.querySelector("header");
+		if (!header) return;
+
+		// Function to get current header height
+		const getHeaderHeight = () => header.clientHeight;
+
+		let headerHeight = getHeaderHeight();
+
+		// Observer callback
+		const handleIntersection: IntersectionObserverCallback = (entries) => {
+			for (const entry of entries) {
+				if (entry.isIntersecting) {
+					const triggerId = entry.target.id;
+					if (triggerId.startsWith("dark-trigger")) {
+						setIsDark(true);
+					} else if (triggerId.startsWith("light-trigger")) {
+						setIsDark(false);
+					}
+				}
+			}
+		};
+
+		// Create IntersectionObserver
+		const observer = new IntersectionObserver(handleIntersection, {
+			root: null,
+			rootMargin: `-${headerHeight}px 0px 0px 0px`,
+			threshold: 0,
+		});
+
+		// Observe triggers
+		observer.observe(darkTrigger);
+		observer.observe(lightTrigger);
+		observer.observe(lightTrigger2);
+
+		// Handle window resize to update header height
+		const handleResize = () => {
+			headerHeight = getHeaderHeight();
+			observer.disconnect();
+			observer.observe(darkTrigger);
+			observer.observe(lightTrigger);
+			observer.observe(lightTrigger2);
+		};
+
+		window.addEventListener("resize", handleResize);
+
+		return () => {
+			observer.disconnect();
+			window.removeEventListener("resize", handleResize);
+		};
+	}, []);
+
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (["ArrowDown", "ArrowUp", "Escape"].includes(e.key)) {
@@ -421,27 +483,28 @@ export const Header = () => {
 					<div className="flex items-center">
 						<Link
 							href="/"
-							className="text-xl font-bold flex items-center gap-2"
+							className={`text-xl font-bold flex items-center gap-2 transition-colors duration-300 ${
+								isDark ? "filter invert" : "filter-none"
+							}`}
 						>
 							<Icon.SolidLogo size={40} />
-							{botName}
+							<span>{botName}</span>
 						</Link>
 					</div>
 
 					<div className="hidden lg:flex items-center">
-						{navigationItems.map((item, index) => (
+						{navigationItems.map((item) => (
 							<Button
 								key={item.name}
-								size={"lg"}
-								variant={"link"}
+								size="lg"
+								variant="link"
 								className="relative px-4"
-								data-nav-item={index}
+								data-nav-item={item.name}
 								tabIndex={0}
 								onMouseEnter={() => handleNavEnter(item)}
 								onMouseLeave={handleNavLeave}
-								onFocus={() => handleNavFocus(item, index)}
+								onFocus={() => handleNavFocus(item, 0)}
 								onClick={() => setActiveNav(item)}
-								data-nav-button={index}
 								onBlur={handleNavBlur}
 							>
 								{item.name}
@@ -751,7 +814,7 @@ export const Header = () => {
 								{activeNav.name === "Plugins" && (
 									<header className="fade flex gap-2 animate-fadeSm">
 										<ul className="flex w-full max-w-[280px] flex-col gap-2">
-											{activeNav.features.map((plugin, index) => (
+											{activeNav.features.map((plugin) => (
 												<li
 													key={plugin.title}
 													data-menu-item={plugin.title}
