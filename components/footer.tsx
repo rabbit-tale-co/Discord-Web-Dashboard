@@ -126,11 +126,11 @@ export function Footer() {
 							/>
 							<Link
 								href="/status"
-								className="group text-sm leading-tight text-primary-foreground/50 hover:text-primary-foreground transition-colors duration-300 flex items-center gap-2"
+								className="group relative text-sm leading-tight text-primary-foreground/50 hover:text-primary-foreground transition-colors duration-150 flex items-center gap-2"
 							>
 								Check Status
 								<SolidArrowRight
-									className="invisible md:visible -right-6 sm:group-hover:rotate-0 -rotate-45 transition-transform duration-300"
+									className="absolute invisible sm:group-hover:visible -right-6 sm:group-hover:rotate-0 -rotate-45 transition-transform duration-300"
 									size={16}
 								/>
 							</Link>
@@ -160,7 +160,7 @@ export function Footer() {
 										>
 											{link.label}
 											<SolidArrowRight
-												className="absolute invisible sm:group-hover:visible -right-6 sm:group-hover:rotate-0 -rotate-45 transition-transform duration-300"
+												className="absolute invisible sm:group-hover:visible -right-6 sm:group-hover:rotate-0 -rotate-45 transition-transform duration-150"
 												size={16}
 											/>
 										</Link>

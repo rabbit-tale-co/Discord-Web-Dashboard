@@ -55,7 +55,7 @@ export const Counters = () => {
 				}
 			},
 			{
-				threshold: 0.7, // Trigger when 70% of the component is visible
+				threshold: 0.3, // Trigger when 30% of the component is visible
 			},
 		);
 
@@ -71,24 +71,30 @@ export const Counters = () => {
 	}, []);
 
 	return (
-		<section ref={countersRef} className="py-10 bg-primary row-start-3">
-			<div className="grid grid-cols-1 md:grid-cols-4 max-w-6xl mx-auto">
-				{stats.map((stat) => (
-					<div
-						key={stat.label}
-						className="group relative p-4 rounded-xl transition-all duration-300 hover:bg-primary-foreground/10 min-w-[250px]"
-					>
-						<div className="h-1 mb-3 rounded-full transition-all duration-300 bg-primary-foreground/10 w-8 group-hover:w-16 group-hover:bg-primary-foreground" />
-						<div className="space-y-1">
-							<NumberFlow
-								value={stat.value}
-								willChange
-								className="block text-primary-foreground text-2xl md:text-3xl font-bold transition-transform duration-300 group-hover:scale-110 group-hover:translate-x-3 tabular-nums"
-							/>
-							<p className="text-sm text-muted-foreground">{stat.label}</p>
+		<section
+			id="counters"
+			data-theme="dark"
+			ref={countersRef}
+			className="py-10 bg-primary"
+		>
+			<div className="max-w-6xl mx-auto px-6">
+				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+					{stats.map((stat) => (
+						<div key={stat.label} className="group max relative p-5 rounded-xl">
+							{/* <div className="h-1 max-sm:hidden mb-4 rounded-full bg-primary-foreground w-12 group-hover:w-24 transition-all duration-300" /> */}
+							<div className="space-y-2 text-center">
+								<NumberFlow
+									value={stat.value}
+									willChange
+									className="text-primary-foreground text-3xl sm:text-4xl font-bold tabular-nums"
+								/>
+								<p className="text-sm sm:text-base text-muted-foreground">
+									{stat.label}
+								</p>
+							</div>
 						</div>
-					</div>
-				))}
+					))}
+				</div>
 			</div>
 		</section>
 	);

@@ -5,13 +5,14 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-	"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 focus-visible:ring-4 focus-visible:outline-1 aria-invalid:focus-visible:ring-0 rounded-full", //[&_svg:not([class*='size-'])]:size-4
+	"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[background,color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 focus-visible:ring-4 focus-visible:outline-1 aria-invalid:focus-visible:ring-0 rounded-full duration-200", //[&_svg:not([class*='size-'])]:size-4
 	{
 		variants: {
 			variant: {
 				default:
 					"bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
-				discord: "bg-[#5865F2] text-white shadow-sm hover:bg-[#5865F2]/90",
+				discord:
+					"bg-discord-bg text-discord-foreground shadow-sm hover:bg-discord-bg/90",
 				destructive:
 					"bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90",
 				outline:
@@ -27,6 +28,10 @@ const buttonVariants = cva(
 				lg: "h-10 px-6 has-[>svg]:px-4",
 				xl: "h-12 px-8 has-[>svg]:px-6",
 				icon: "size-9",
+				iconSm: "size-8",
+				iconMd: "size-10",
+				iconLg: "size-12",
+				iconXl: "size-14",
 			},
 		},
 		defaultVariants: {

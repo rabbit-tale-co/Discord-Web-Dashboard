@@ -13,3 +13,6 @@ export * from "./assets/logo/logo_text";
 export * from "./assets/arrows/ArrowLeft";
 export * from "./assets/arrows/ArrowRight";
 export * from "./assets/arrows/Repeat";
+export * from "./assets/user_interface/crown";
+export * from "./assets/socials/discord";
+export * from "./assets/user_interface/menu";
