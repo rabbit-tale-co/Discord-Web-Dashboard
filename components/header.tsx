@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import * as Icon from "@/components/icons";
+import { useAuth } from "@/app/authContext";
+import { UserAvatar } from "@/components/user-avatar";
 
 type NavItem = {
 	name: string;
@@ -127,72 +129,17 @@ export const Header = () => {
 		width: 0,
 		height: 0,
 	});
+	const [currentUrl, setCurrentUrl] = useState("");
+	const [isMounted, setIsMounted] = useState(false);
 
 	const contentRef = useRef<HTMLDivElement>(null);
 	const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
 	const botName = process.env.NEXT_PUBLIC_BOT_NAME || "";
-
-	// State to manage theme inversion
-	const [isDark, setIsDark] = useState(false);
+	const { user, login } = useAuth();
 
 	useEffect(() => {
-		// Select trigger elements by their IDs
-		const darkTrigger = document.getElementById("dark-trigger");
-		const lightTrigger = document.getElementById("light-trigger");
-		const lightTrigger2 = document.getElementById("light-trigger-2");
-
-		if (!darkTrigger || !lightTrigger || !lightTrigger2) return;
-
-		const header = document.querySelector("header");
-		if (!header) return;
-
-		// Function to get current header height
-		const getHeaderHeight = () => header.clientHeight;
-
-		let headerHeight = getHeaderHeight();
-
-		// Observer callback
-		const handleIntersection: IntersectionObserverCallback = (entries) => {
-			for (const entry of entries) {
-				if (entry.isIntersecting) {
-					const triggerId = entry.target.id;
-					if (triggerId.startsWith("dark-trigger")) {
-						setIsDark(true);
-					} else if (triggerId.startsWith("light-trigger")) {
-						setIsDark(false);
-					}
-				}
-			}
-		};
-
-		// Create IntersectionObserver
-		const observer = new IntersectionObserver(handleIntersection, {
-			root: null,
-			rootMargin: `-${headerHeight}px 0px 0px 0px`,
-			threshold: 0,
-		});
-
-		// Observe triggers
-		observer.observe(darkTrigger);
-		observer.observe(lightTrigger);
-		observer.observe(lightTrigger2);
-
-		// Handle window resize to update header height
-		const handleResize = () => {
-			headerHeight = getHeaderHeight();
-			observer.disconnect();
-			observer.observe(darkTrigger);
-			observer.observe(lightTrigger);
-			observer.observe(lightTrigger2);
-		};
-
-		window.addEventListener("resize", handleResize);
-
-		return () => {
-			observer.disconnect();
-			window.removeEventListener("resize", handleResize);
-		};
+		setCurrentUrl(window.location.href);
+		setIsMounted(true);
 	}, []);
 
 	useEffect(() => {
@@ -402,6 +349,8 @@ export const Header = () => {
 		}
 	};
 
+	if (!isMounted) return null;
+
 	return (
 		<header className="fixed w-full top-0 pt-4 z-50 bg-background/75 backdrop-blur-md">
 			{/* Progressive Blur Overlay */}
@@ -483,9 +432,9 @@ export const Header = () => {
 					<div className="flex items-center">
 						<Link
 							href="/"
-							className={`text-xl font-bold flex items-center gap-2 transition-colors duration-300 ${
-								isDark ? "filter invert" : "filter-none"
-							}`}
+							className={
+								"text-xl font-bold flex items-center gap-2 transition-colors duration-300"
+							}
 						>
 							<Icon.SolidLogo size={40} />
 							<span>{botName}</span>
@@ -522,20 +471,18 @@ export const Header = () => {
 								<Icon.SolidCrown size={22} />
 							</Link>
 						</Button>
-						<Button
-							asChild
-							size="lg"
-							variant="discord"
-							className="max-md:hidden"
-						>
-							<Link
-								href="/login"
-								className="focus:outline-none hover:bg-[#5865F2]/90 focus:bg-[#5865F2]/90"
-							>
-								Login
-								<Icon.SolidDiscord size={22} />
-							</Link>
-						</Button>
+						{user ? (
+							<UserAvatar user={user} />
+						) : (
+							<Button asChild variant="discord" size="lg">
+								<Link
+									href={`https://discord.com/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&redirect_uri=${process.env.NEXT_PUBLIC_DASHBOARD_URL}/api/auth/callback&response_type=code&scope=identify%20email`}
+								>
+									Login
+									<Icon.SolidDiscord size={22} />
+								</Link>
+							</Button>
+						)}
 						<Button
 							variant={"secondary"}
 							size={"iconLg"}
@@ -745,7 +692,7 @@ export const Header = () => {
 											<li className="flex grow">
 												<Link
 													href={activeNav.features[1].path || ""}
-													className="group relative flex h-full w-full shrink-0 flex-col justify-end gap-6 overflow-hidden rounded-lg bg-neutral-900 hover:bg-neutral-800 focus:bg-neutral-800"
+													className="group relative flex h-full w-full shrink-0 flex-col justify-end gap-6 overflow-hidden rounded-lg bg-neutral-900 hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none"
 													data-menu-item={activeNav.features[1].path}
 													tabIndex={0}
 												>

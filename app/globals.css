@@ -10,7 +10,7 @@
 }
 
 .container {
-  @apply px-8
+  @apply px-6 md:px-10
 }
 
 :root {

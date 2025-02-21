@@ -5,29 +5,32 @@ import { SolidArrowRight, SolidLogo } from "./icons";
 import { useEffect, useState } from "react";
 import { Separator } from "./ui/separator";
 
+// Update the type to match the actual API response
+type StatusResponse = {
+	version: string;
+	healthStatus: {
+		bot_status: "working" | "not_working" | "disabled" | "booting_up";
+		db_status: {
+			status: string;
+			error?: string;
+		};
+	};
+};
+
 export function Footer() {
 	const botName = process.env.NEXT_PUBLIC_BOT_NAME || "";
 	const brandName = "Rabbit Tale Studio";
 	const currentYear = new Date().getFullYear();
 
-	const [botStatus, setBotStatus] = useState<
-		"working" | "not_working" | "disabled" | "booting_up"
-	>("booting_up");
+	const [botStatus, setBotStatus] =
+		useState<StatusResponse["healthStatus"]["bot_status"]>("disabled");
 
 	useEffect(() => {
-		// Replace this with your actual status fetching logic
-		const fetchStatus = () => {
-			// Example: Fetch status from an API
-			fetch("/api/bot/status")
-				.then((res) => res.json())
-				.then((data) => setBotStatus(data.status))
-				.catch(() => setBotStatus("not_working"));
-		};
-
-		fetchStatus();
-		const interval = setInterval(fetchStatus, 60_000); // Refresh every minute
-
-		return () => clearInterval(interval);
+		fetch("/api/status")
+			.then((res) => res.json())
+			.then((data) => {
+				setBotStatus(data.healthStatus.bot_status);
+			});
 	}, []);
 
 	const companyLinks = [
@@ -96,29 +99,33 @@ export function Footer() {
 					<section className="flex flex-col max-md:items-center max-md:mt-6">
 						<div className="flex items-center gap-2 h-4.5">
 							<span
-								aria-label={`bot status: ${botStatus}`}
-								className={`relative size-3 rounded-full ${
-									{
-										working: "bg-green-500",
-										not_working: "bg-red-500",
-										disabled: "bg-gray-500",
-										booting_up: "bg-yellow-500",
-									}[botStatus]
+								aria-label={`bot status: ${botStatus || "unknown"}`}
+								className={`relative size-2 rounded-full ${
+									botStatus
+										? {
+												working: "bg-green-500",
+												not_working: "bg-red-500",
+												disabled: "bg-gray-500",
+												booting_up: "bg-yellow-500",
+											}[botStatus]
+										: "bg-gray-500"
 								}`}
 							>
 								<span
-									className={`absolute top-0 left-0 size-3 rounded-full border-2 ${
-										{
-											working: "border-green-500",
-											not_working: "border-red-500",
-											disabled: "border-gray-500",
-											booting_up: "border-yellow-500",
-										}[botStatus]
+									className={`absolute top-0 left-0 size-2 rounded-full border-2 ${
+										botStatus
+											? {
+													working: "border-green-500",
+													not_working: "border-red-500",
+													disabled: "border-gray-500",
+													booting_up: "border-yellow-500",
+												}[botStatus]
+											: "border-gray-500"
 									} animate-ping`}
 								/>
 							</span>
 							<span className="text-sm leading-tight text-primary-foreground/30 capitalize">
-								{botStatus.replace("_", " ")}
+								{botStatus ? botStatus.replace("_", " ") : "unknown"}
 							</span>
 							<Separator
 								orientation="vertical"

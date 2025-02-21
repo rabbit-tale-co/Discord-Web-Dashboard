@@ -1,16 +1,29 @@
-import React from "react";
+"use client";
+import React, { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { CTA } from "@/components/cta";
 import Hero from "@/components/hero";
 import Image from "next/image";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Counters } from "@/components/counters";
+import { PluginsShowcase } from "@/components/plugin-showcase";
+import { toast } from "sonner";
 
 export default function Home() {
+	const searchParams = useSearchParams();
+	const error = searchParams.get("error");
+
+	useEffect(() => {
+		if (error) {
+			toast.error(error);
+		}
+	}, [error]);
+
 	return (
 		<React.Fragment>
 			<Header />
-			<div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen container pb-20 gap-16 font-[family-name:var(--font-geist-sans)] max-w-7xl mx-auto">
+			<div className="grid grid-rows-[.03fr_1fr] sm:grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen container pb-20 gap-16 font-[family-name:var(--font-geist-sans)] max-w-7xl mx-auto">
 				<main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
 					<Hero />
 				</main>
@@ -63,6 +76,7 @@ export default function Home() {
 				</footer>
 			</div>
 			<Counters />
+			{/* <PluginsShowcase /> */}
 			<CTA />
 			<Footer />
 		</React.Fragment>

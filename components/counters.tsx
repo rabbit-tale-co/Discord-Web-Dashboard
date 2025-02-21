@@ -1,88 +1,104 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
 import NumberFlow from "@number-flow/react";
+import { useEffect, useRef, useState } from "react";
+
+type BotStats = {
+	servers: number;
+	birthday_messages: number;
+	starboard_posts: number;
+	temp_channels: number;
+	tickets_opened: number;
+	total_xp: number;
+};
 
 export const Counters = () => {
-	const [stats, setStats] = useState([
-		{
-			value: 0,
-			label: "Gained XP",
-		},
-		{
-			value: 0,
-			label: "Servers",
-		},
-		{
-			value: 0,
-			label: "Starboards",
-		},
-		{
-			value: 0,
-			label: "Tickets",
-		},
-	]);
+	const [data, setData] = useState<BotStats | null>(null);
+	const [status, setStatus] = useState<"loading" | "error" | "success">(
+		"loading",
+	);
 
-	const countersRef = useRef<HTMLDivElement>(null);
-	const hasAnimated = useRef(false);
-
+	// ✅ Pobieramy dane z cookies/API
 	useEffect(() => {
-		const current = countersRef.current;
-		if (!current) return;
-
-		const observer = new IntersectionObserver(
-			(entries) => {
-				for (const entry of entries) {
-					if (entry.isIntersecting && !hasAnimated.current) {
-						setStats([
-							{
-								value: 23000000,
-								label: "Gained XP",
-							},
-							{
-								value: 300000,
-								label: "Servers",
-							},
-							{
-								value: 2000000,
-								label: "Starboards",
-							},
-							{
-								value: 24000000,
-								label: "Tickets",
-							},
-						]);
-						hasAnimated.current = true;
-						observer.disconnect();
-					}
-				}
-			},
-			{
-				threshold: 0.3, // Trigger when 30% of the component is visible
-			},
-		);
-
-		observer.observe(current);
-
-		return () => {
-			if (current) {
-				observer.unobserve(current);
+		const fetchData = async () => {
+			try {
+				const res = await fetch("/api/stats");
+				if (!res.ok) throw new Error("Failed to fetch");
+				const json = await res.json();
+				setData(json);
+			} catch (err) {
+				console.error("❌ Error loading data:", err);
+				setStatus("error");
+			} finally {
+				setStatus("success");
 			}
 		};
+		fetchData();
 	}, []);
 
+	// ✅ Intersection Observer dla animacji liczników
+	const countersRef = useRef<HTMLDivElement>(null);
+	const hasAnimated = useRef(false);
+	const [displayStats, setDisplayStats] = useState([
+		{ value: 0, label: "Gained XP" },
+		{ value: 0, label: "Servers" },
+		{ value: 0, label: "Starboards" },
+		{ value: 0, label: "Tickets" },
+	]);
+
+	useEffect(() => {
+		if (!countersRef.current || !data || hasAnimated.current) return;
+
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				if (entry.isIntersecting) {
+					setDisplayStats([
+						{ value: data.total_xp, label: "Gained XP" },
+						{ value: data.servers, label: "Servers" },
+						{ value: data.starboard_posts, label: "Starboards" },
+						{ value: data.tickets_opened, label: "Tickets" },
+					]);
+					hasAnimated.current = true;
+					observer.disconnect();
+				}
+			},
+			{ threshold: 0.7 },
+		);
+
+		observer.observe(countersRef.current);
+
+		return () => observer.disconnect(); // Cleanup observer
+	}, [data]);
+
+	// ✅ Obsługa błędów
+	if (status === "error") {
+		return (
+			<section className="py-10 bg-primary flex justify-center items-center">
+				<div className="text-center">
+					<p className="text-xl text-red-500">Failed to load stats.</p>
+				</div>
+			</section>
+		);
+	}
+
+	// ✅ Obsługa ładowania
+	if (status === "loading" || !data) {
+		return (
+			<section className="py-10 bg-primary flex justify-center items-center">
+				<div className="text-center">
+					<p className="text-xl text-muted-foreground">Loading...</p>
+				</div>
+			</section>
+		);
+	}
+
+	// ✅ Renderowanie końcowe
 	return (
-		<section
-			id="counters"
-			data-theme="dark"
-			ref={countersRef}
-			className="py-10 bg-primary"
-		>
+		<section ref={countersRef} className="py-10 bg-primary">
 			<div className="max-w-6xl mx-auto px-6">
 				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-					{stats.map((stat) => (
-						<div key={stat.label} className="group max relative p-5 rounded-xl">
-							{/* <div className="h-1 max-sm:hidden mb-4 rounded-full bg-primary-foreground w-12 group-hover:w-24 transition-all duration-300" /> */}
+					{displayStats.map((stat) => (
+						<div key={stat.label} className="group relative p-5 rounded-xl">
 							<div className="space-y-2 text-center">
 								<NumberFlow
 									value={stat.value}
