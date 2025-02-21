@@ -11,7 +11,7 @@ import { SolidDiscord } from "./icons/assets/socials/discord";
 import NumberFlow from "@number-flow/react";
 import React from "react";
 
-export default React.memo(function Hero() {
+export default function Hero() {
 	return (
 		<div className="w-full mx-auto">
 			<div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 items-stretch">
@@ -51,9 +51,9 @@ export default React.memo(function Hero() {
 			</div>
 		</div>
 	);
-});
+}
 
-const Counter = React.memo(() => {
+const Counter = () => {
 	const [userTrusted, setUserTrusted] = useState(0);
 	const [rating, setRating] = useState(0);
 	const [ratingCount, setRatingCount] = useState(0);
@@ -114,10 +114,10 @@ const Counter = React.memo(() => {
 			</div>
 		</div>
 	);
-});
+};
 
 // Extract and memoize avatar group
-const AvatarGroup = React.memo(({ avatarSrc }: { avatarSrc: string }) => (
+const AvatarGroup = ({ avatarSrc }: { avatarSrc: string }) => (
 	<div className="flex -space-x-3 *:ring-1 *:ring-white *:ring-offset-2 *:ring-offset-background items-center *:hover:not-last:-translate-x-2 *:transition-transform *:duration-300">
 		{[1, 2, 3].map((i) => (
 			<Avatar key={i}>
@@ -126,27 +126,27 @@ const AvatarGroup = React.memo(({ avatarSrc }: { avatarSrc: string }) => (
 			</Avatar>
 		))}
 	</div>
-));
+);
 
 // Optimize Hero component
-const OptimizedDiscordDisplay = React.memo(() => (
+const OptimizedDiscordDisplay = () => (
 	<div className="flex items-center bg-secondary rounded-[20px] squarcle-mask justify-center overflow-hidden h-full">
 		<div className="relative z-10 w-full h-full group">
 			<DiscordIcon />
 			<LogoIcon />
 		</div>
 	</div>
-));
+);
 
 // Memoize individual icons
-const DiscordIcon = React.memo(() => (
+const DiscordIcon = () => (
 	<div className="absolute -top-20 -right-16 rotate-[-4deg] group-hover:rotate-[2deg] group-hover:translate-x-[12px] group-hover:translate-y-[12px] transition-transform duration-300">
 		<SolidDiscord size={250} className="text-secondary-foreground" />
 	</div>
-));
+);
 
-const LogoIcon = React.memo(() => (
+const LogoIcon = () => (
 	<div className="absolute -bottom-12 -left-16 rotate-[4deg] group-hover:rotate-[-6deg] group-hover:translate-x-[12px] group-hover:-translate-y-[12px] transition-transform duration-300">
 		<SolidLogo size={280} className="text-secondary-foreground" />
 	</div>
-));
+);

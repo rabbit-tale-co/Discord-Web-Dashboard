@@ -1,7 +1,9 @@
 "use client";
+
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { Suspense } from "react";
 
 const HTTP_STATUS_MESSAGES: Record<number, string> = {
 	400: "Bad Request",
@@ -11,7 +13,7 @@ const HTTP_STATUS_MESSAGES: Record<number, string> = {
 	500: "Internal Server Error",
 };
 
-export default function ErrorPage() {
+function ErrorContent() {
 	const searchParams = useSearchParams();
 	const statusCode = Number(searchParams.get("status")) || 500;
 	const errorCode = searchParams.get("code") || "unknown_error";
@@ -49,5 +51,13 @@ export default function ErrorPage() {
 				<Link href="/">Return to Home</Link>
 			</Button>
 		</div>
+	);
+}
+
+export default function ErrorPage() {
+	return (
+		<Suspense fallback={<div>Loading...</div>}>
+			<ErrorContent />
+		</Suspense>
 	);
 }

@@ -129,16 +129,14 @@ export const Header = () => {
 		width: 0,
 		height: 0,
 	});
-	const [currentUrl, setCurrentUrl] = useState("");
 	const [isMounted, setIsMounted] = useState(false);
 
 	const contentRef = useRef<HTMLDivElement>(null);
 	const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const botName = process.env.NEXT_PUBLIC_BOT_NAME || "";
-	const { user, login } = useAuth();
+	const { user } = useAuth();
 
 	useEffect(() => {
-		setCurrentUrl(window.location.href);
 		setIsMounted(true);
 	}, []);
 

@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import * as Icon from "@/components/icons";
 
@@ -76,8 +75,6 @@ const plugins: Plugin[] = [
 ];
 
 export const PluginsShowcase = () => {
-	const [hoveredPlugin, setHoveredPlugin] = useState<string | null>(null);
-
 	return (
 		<section id="plugins" className="py-16 bg-background">
 			<div className="container max-w-7xl mx-auto px-6 text-center">
@@ -94,8 +91,6 @@ export const PluginsShowcase = () => {
 							<div
 								key={plugin.name}
 								className="group relative rounded-xl overflow-hidden shadow-lg border border-border bg-card transition-all duration-300 hover:shadow-xl hover:border-primary"
-								onMouseEnter={() => setHoveredPlugin(plugin.name)}
-								onMouseLeave={() => setHoveredPlugin(null)}
 							>
 								<div className="relative w-full h-40">
 									<Image

@@ -7,10 +7,10 @@ import Image from "next/image";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Counters } from "@/components/counters";
-import { PluginsShowcase } from "@/components/plugin-showcase";
 import { toast } from "sonner";
+import { Suspense } from "react";
 
-export default function Home() {
+function HomeContent() {
 	const searchParams = useSearchParams();
 	const error = searchParams.get("error");
 
@@ -80,5 +80,13 @@ export default function Home() {
 			<CTA />
 			<Footer />
 		</React.Fragment>
+	);
+}
+
+export default function HomePage() {
+	return (
+		<Suspense fallback={<div>Loading...</div>}>
+			<HomeContent />
+		</Suspense>
 	);
 }
