@@ -8,7 +8,6 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Counters } from "@/components/counters";
 import { toast } from "sonner";
-import { Suspense } from "react";
 
 function HomeContent() {
 	const searchParams = useSearchParams();
@@ -84,9 +83,5 @@ function HomeContent() {
 }
 
 export default function HomePage() {
-	return (
-		<Suspense fallback={<div>Loading...</div>}>
-			<HomeContent />
-		</Suspense>
-	);
+	return <HomeContent />;
 }

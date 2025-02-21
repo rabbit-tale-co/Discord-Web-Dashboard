@@ -3,7 +3,6 @@
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Suspense } from "react";
 
 const HTTP_STATUS_MESSAGES: Record<number, string> = {
 	400: "Bad Request",
@@ -55,9 +54,5 @@ function ErrorContent() {
 }
 
 export default function ErrorPage() {
-	return (
-		<Suspense fallback={<div>Loading...</div>}>
-			<ErrorContent />
-		</Suspense>
-	);
+	return <ErrorContent />;
 }
