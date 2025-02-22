@@ -339,7 +339,7 @@ export const Header = () => {
 	if (!isMounted) return null;
 
 	return (
-		<header className="fixed w-full top-0 pt-2 sm:pt-4 z-50 bg-background/75 backdrop-blur-md">
+		<header className="fixed w-full top-0 pt-2 sm:pt-4 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
 			{/* Progressive Blur Overlay */}
 			<div className="absolute hidden inset-0  pointer-events-none transform scale-y-[-1]">
 				{/* Layer 1 (backdrop-blur-[1px]) – oryginalne: 0, 12.5, 25, 37.5 */}

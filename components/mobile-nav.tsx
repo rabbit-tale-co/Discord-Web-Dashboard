@@ -16,6 +16,13 @@ import type { NavItem } from "@/types";
 import type { UserSession } from "@/app/authContext";
 import { useAuth } from "@/app/authContext";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import {
+	DropdownMenu,
+	DropdownMenuItem,
+	DropdownMenuContent,
+	DropdownMenuSeparator,
+} from "./ui/dropdown-menu";
+import { DropdownMenuTrigger } from "./ui/dropdown-menu";
 
 const navigationItems: NavItem[] = [
 	{
@@ -247,33 +254,65 @@ export function MobileNav({ user }: { user?: UserSession }) {
 				{user ? (
 					<div className="border-t">
 						<div className="p-4 flex gap-2 items-center justify-between">
-							<div className="flex size-8 items-center justify-center rounded-full border">
+							<div className="flex items-center justify-center gap-2">
 								{user.avatar ? (
-									<Avatar className="size-8 rounded-full">
+									<Avatar className="size-10 rounded-full">
 										<AvatarImage src={avatarUrl} alt={user.username} />
 										<AvatarFallback>{user.username.charAt(0)}</AvatarFallback>
 									</Avatar>
 								) : (
 									<User className="size-4" />
 								)}
+								<div className="flex flex-col items-start gap-1.5">
+									<h4 className="font-medium leading-none">
+										{user.global_name}
+									</h4>
+									<span className="text-xs text-muted-foreground leading-none">
+										{user.email}
+									</span>
+								</div>
 							</div>
-							<div className="flex flex-col items-start gap-0.5">
-								<span className="font-medium">{user.global_name}</span>
-								<span className="text-xs text-muted-foreground">
-									{user.email}
-								</span>
-							</div>
-							<Button variant="ghost" size="iconLg" onClick={() => logout()}>
-								<Icon.OutlineArrowRight className="size-4" />
-							</Button>
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button
+										variant="ghost"
+										size="iconLg"
+										className="flex items-center justify-center gap-2 p-0"
+									>
+										<Icon.OutlineArrowRight className="size-4" />
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end">
+									<DropdownMenuItem asChild>
+										<Link href="/servers">
+											<Icon.OutlineArrowRight size={16} />
+											My Servers
+										</Link>
+									</DropdownMenuItem>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem onClick={() => logout()}>
+										<Icon.OutlineArrowRight size={16} />
+										Logout
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
 						</div>
 					</div>
 				) : (
 					<div className="border-t">
 						<div className="p-4">
-							<Button variant="discord" className="w-full justify-start gap-2">
-								Login
-								<Icon.SolidDiscord />
+							<Button
+								variant="discord"
+								asChild
+								className="w-full gap-2"
+								size="lg"
+							>
+								<Link
+									href={`https://discord.com/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&redirect_uri=${process.env.NEXT_PUBLIC_DASHBOARD_URL}/api/auth/callback&response_type=code&scope=identify%20email`}
+								>
+									Login with Discord
+									<Icon.SolidDiscord />
+								</Link>
 							</Button>
 						</div>
 					</div>

@@ -67,9 +67,9 @@ const Counter = () => {
 	}, []);
 
 	return (
-		<div className="flex sm:gap-4 mt-auto max-sm:justify-center">
+		<div className="flex max-sm:flex-col gap-4 pt-4 mt-auto max-sm:justify-center">
 			{/* Users Trusted */}
-			<div className="flex flex-col items-center pt-4 sm:flex-row gap-3 max-sm:w-full">
+			<div className="flex flex-col items-center sm:flex-row gap-3 max-sm:w-full">
 				<div className="flex flex-col items-center">
 					<AvatarGroup avatarSrc="https://github.com/shadcn.png" />
 				</div>
@@ -86,7 +86,7 @@ const Counter = () => {
 				</div>
 			</div>
 			{/* Rating */}
-			<div className="flex flex-col items-center pt-4 sm:flex-row gap-3 max-sm:w-full">
+			<div className="flex flex-col items-center sm:flex-row gap-3 max-sm:w-full">
 				<div className="flex justify-center items-center size-10 bg-muted rounded-full">
 					<Star size={22} />
 				</div>
@@ -116,7 +116,6 @@ const Counter = () => {
 	);
 };
 
-// Extract and memoize avatar group
 const AvatarGroup = ({ avatarSrc }: { avatarSrc: string }) => (
 	<div className="flex -space-x-3 *:ring-1 *:ring-white *:ring-offset-2 *:ring-offset-background items-center *:hover:not-last:-translate-x-2 *:transition-transform *:duration-300">
 		{[1, 2, 3].map((i) => (
@@ -128,7 +127,6 @@ const AvatarGroup = ({ avatarSrc }: { avatarSrc: string }) => (
 	</div>
 );
 
-// Optimize Hero component
 const OptimizedDiscordDisplay = () => (
 	<div className="flex items-center bg-secondary rounded-[20px] squarcle-mask justify-center overflow-hidden h-full">
 		<div className="relative z-10 w-full h-full group">
@@ -138,7 +136,6 @@ const OptimizedDiscordDisplay = () => (
 	</div>
 );
 
-// Memoize individual icons
 const DiscordIcon = () => (
 	<div className="absolute -top-20 -right-16 rotate-[-4deg] group-hover:rotate-[2deg] group-hover:translate-x-[12px] group-hover:translate-y-[12px] transition-transform duration-300">
 		<SolidDiscord size={250} className="text-secondary-foreground" />
