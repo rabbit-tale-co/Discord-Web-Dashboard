@@ -7,18 +7,8 @@ import Image from "next/image";
 import * as Icon from "@/components/icons";
 import { useAuth } from "@/app/authContext";
 import { UserAvatar } from "@/components/user-avatar";
-
-type NavItem = {
-	name: string;
-	path: string;
-	features?: {
-		title: string;
-		description: string;
-		path?: string;
-		image?: string;
-		icon?: string;
-	}[];
-};
+import { MobileNav } from "@/components/mobile-nav";
+import type { NavItem } from "@/types";
 
 const navigationItems: NavItem[] = [
 	{
@@ -46,25 +36,25 @@ const navigationItems: NavItem[] = [
 			{
 				title: "Moderation Tools",
 				description: "Advanced moderation tools to keep your server safe",
-				icon: "Shield",
+				icon: Icon.SolidLogo,
 				path: "/features/moderation",
 			},
 			{
 				title: "Custom Commands",
 				description: "Create and manage custom commands",
-				icon: "Terminal",
+				icon: Icon.SolidLogo,
 				path: "/features/commands",
 			},
 			{
 				title: "Auto Roles",
 				description: "Automatically assign roles to new members",
-				icon: "Users",
+				icon: Icon.SolidLogo,
 				path: "/features/roles",
 			},
 			{
 				title: "Welcome Messages",
 				description: "Customize how you greet new members",
-				icon: "MessageSquare",
+				icon: Icon.SolidLogo,
 				path: "/features/welcome",
 			},
 		],
@@ -118,7 +108,6 @@ const navigationItems: NavItem[] = [
 ];
 
 export const Header = () => {
-	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 	const [activeNav, setActiveNav] = useState<NavItem | null>(null);
 	const [isKeyboardNavigation, setIsKeyboardNavigation] = useState(false);
 	const [isMouseInteraction, setIsMouseInteraction] = useState(false);
@@ -350,7 +339,7 @@ export const Header = () => {
 	if (!isMounted) return null;
 
 	return (
-		<header className="fixed w-full top-0 pt-4 z-50 bg-background/75 backdrop-blur-md">
+		<header className="fixed w-full top-0 pt-2 sm:pt-4 z-50 bg-background/75 backdrop-blur-md">
 			{/* Progressive Blur Overlay */}
 			<div className="absolute hidden inset-0  pointer-events-none transform scale-y-[-1]">
 				{/* Layer 1 (backdrop-blur-[1px]) – oryginalne: 0, 12.5, 25, 37.5 */}
@@ -459,7 +448,7 @@ export const Header = () => {
 						))}
 					</div>
 
-					<div className="flex items-center space-x-3">
+					<div className="flex items-center gap-3">
 						<Button asChild size="lg" className="max-md:hidden">
 							<Link
 								href="/premium"
@@ -472,7 +461,12 @@ export const Header = () => {
 						{user ? (
 							<UserAvatar user={user} />
 						) : (
-							<Button asChild variant="discord" size="lg">
+							<Button
+								asChild
+								variant="discord"
+								size="lg"
+								className="max-md:hidden"
+							>
 								<Link
 									href={`https://discord.com/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&redirect_uri=${process.env.NEXT_PUBLIC_DASHBOARD_URL}/api/auth/callback&response_type=code&scope=identify%20email`}
 								>
@@ -481,14 +475,50 @@ export const Header = () => {
 								</Link>
 							</Button>
 						)}
-						<Button
+						{/* <Button
 							variant={"secondary"}
 							size={"iconLg"}
 							className="lg:hidden"
 							onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
 						>
 							<Icon.OutlineMenu size={22} />
-						</Button>
+						</Button> */}
+						<MobileNav user={user ?? undefined} />
+						{/* <Sheet>
+							<SheetTrigger asChild>
+								<Button
+									variant={"secondary"}
+									size={"iconLg"}
+									className="lg:hidden"
+								>
+									<Icon.OutlineMenu size={22} />
+								</Button>
+							</SheetTrigger>
+							<SheetContent side={"left"}>
+								<SheetHeader>
+									<SheetTitle className="flex items-center gap-2">
+										<Icon.SolidLogo size={40} />
+										<span className="text-xl font-bold">{botName}</span>
+									</SheetTitle>
+								</SheetHeader>
+								<SidebarProvider>
+									<DashboardSidebar />
+								</SidebarProvider>
+								<div className="flex flex-col gap-4">
+									{navigationItems.map((item) => (
+										<Button
+											key={item.name}
+											variant="link"
+											size="lg"
+											asChild
+											className="w-full justify-start"
+										>
+											<Link href={item.path}>{item.name}</Link>
+										</Button>
+									))}
+								</div>
+							</SheetContent>
+						</Sheet> */}
 					</div>
 				</nav>
 			</div>

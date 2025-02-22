@@ -15,3 +15,16 @@ export interface SessionData {
 		token_type: string;
 	};
 }
+
+export interface NavItem {
+	name: string;
+	path: string;
+	icon?: React.ElementType;
+	features?: {
+		title: string;
+		description: string;
+		path?: string;
+		image?: string;
+		icon?: React.ElementType;
+	}[];
+}

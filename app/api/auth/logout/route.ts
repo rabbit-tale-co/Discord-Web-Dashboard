@@ -1,10 +1,8 @@
-// app/api/logout/route.js
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
 	const response = NextResponse.redirect(new URL("/", request.url));
 
-	// Ustaw ciasteczka z ujemnym maxAge, aby je usunąć
 	response.cookies.delete("access_token");
 	response.cookies.delete("refresh_token");
 	response.cookies.delete("user");

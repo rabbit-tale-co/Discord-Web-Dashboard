@@ -88,7 +88,7 @@ export default function Servers() {
 	return (
 		<React.Fragment>
 			<Header />
-			<div className="grid grid-rows-[.03fr_1fr] sm:grid-rows-[.2fr_1fr] min-h-screen container pb-20 gap-16 max-w-7xl mx-auto">
+			<div className="grid grid-rows-[.05fr_1fr] sm:grid-rows-[.2fr_1fr] min-h-screen container pb-20 gap-16 max-w-7xl mx-auto">
 				<main className="flex flex-col gap-8 row-start-2 items-center sm:items-start w-full">
 					<div className="space-y-12 max-w-7xl mx-auto">
 						{/* 🔹 Header Section */}
@@ -108,36 +108,36 @@ export default function Servers() {
 									className="group relative overflow-hidden rounded-3xl bg-primary transition-all duration-300 p-1"
 								>
 									{/* Inner Grid Layout */}
-									<div className="grid grid-rows-[auto_1fr_auto] gap-2">
+									<div className="flex flex-col gap-2">
 										{/* 🔹 Image Container */}
 										<div className="relative w-full aspect-video overflow-hidden rounded-[20px]">
 											<Image
 												src={server.avatar || "/default-server-avatar.png"}
 												alt={server.name}
-												width={800}
+												width={900}
 												height={600}
-												className="h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+												className="h-full w-full object-cover object-center transition-transform duration-300 sm:group-hover:scale-105"
 											/>
+											<div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-transparent" />
 											{server.hasPremium && (
 												<Button
 													variant={"outline"}
 													size={"icon"}
 													className="absolute top-2 right-2"
 												>
-													<Icon.SolidCrown size={20} />
+													<Icon.OutlineCrown size={20} />
 												</Button>
 											)}
-											{/* <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" /> */}
 										</div>
 
 										{/* 🔹 Server Information */}
 
-										<div className="flex justify-between items-end pl-4 pr-2">
-											<div className="flex flex-col items-start">
-												<h3 className="text-lg font-semibold text-white">
+										<div className="flex gap-2 justify-between items-end pr-2 pb-2">
+											<div className="flex flex-col items-start max-w-[50%] pl-3">
+												<h3 className="text-lg truncate font-semibold text-white w-full">
 													{server.name}
 												</h3>
-												<p className="text-sm text-muted-foreground font-medium">
+												<p className="text-sm text-white/75 font-medium">
 													{server.memberCount.toLocaleString()} members
 												</p>
 											</div>

@@ -9,10 +9,10 @@ import {
 	type SetStateAction,
 } from "react";
 
-interface UserSession {
+export interface UserSession {
 	id: string;
 	username: string;
-	display_name: string;
+	global_name: string;
 	avatar: string;
 	email: string;
 	verified: boolean;

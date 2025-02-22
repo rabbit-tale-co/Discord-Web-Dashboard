@@ -22,7 +22,7 @@ function HomeContent() {
 	return (
 		<React.Fragment>
 			<Header />
-			<div className="grid grid-rows-[.03fr_1fr] sm:grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen container pb-20 gap-16 font-[family-name:var(--font-geist-sans)] max-w-7xl mx-auto">
+			<div className="grid grid-rows-[.1fr_1fr] sm:grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen container pb-20 gap-16 font-[family-name:var(--font-geist-sans)] max-w-7xl mx-auto">
 				<main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
 					<Hero />
 				</main>
