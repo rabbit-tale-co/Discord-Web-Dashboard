@@ -1,304 +1,69 @@
 "use client";
 import type React from "react";
-import { useState, useRef, useEffect } from "react";
+import { useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
 import * as Icon from "@/components/icons";
 import { useAuth } from "@/app/authContext";
 import { UserAvatar } from "@/components/user-avatar";
 import { MobileNav } from "@/components/mobile-nav";
-import type { NavItem } from "@/types";
-
-const navigationItems: NavItem[] = [
-	{
-		name: "Features",
-		path: "/features",
-		features: [
-			{
-				title: "Analytics Dashboard",
-				description: "Track your server's growth and engagement",
-				path: "/features/analytics",
-				// image: "/images/analytics.jpg",
-			},
-			{
-				title: "Server Insights",
-				description: "Get detailed insights about your community",
-				path: "/features/insights",
-				// image: "/images/insights.jpg",
-			},
-			{
-				title: "Integration Hub",
-				description: "Connect with your favorite services",
-				path: "/features/integrations",
-				image: "/images/integrations.jpg",
-			},
-			{
-				title: "Moderation Tools",
-				description: "Advanced moderation tools to keep your server safe",
-				icon: Icon.SolidLogo,
-				path: "/features/moderation",
-			},
-			{
-				title: "Custom Commands",
-				description: "Create and manage custom commands",
-				icon: Icon.SolidLogo,
-				path: "/features/commands",
-			},
-			{
-				title: "Auto Roles",
-				description: "Automatically assign roles to new members",
-				icon: Icon.SolidLogo,
-				path: "/features/roles",
-			},
-			{
-				title: "Welcome Messages",
-				description: "Customize how you greet new members",
-				icon: Icon.SolidLogo,
-				path: "/features/welcome",
-			},
-		],
-	},
-	{
-		name: "Solutions",
-		path: "/solutions",
-		features: [
-			{
-				title: "For Gaming Communities",
-				description: "Enhance your gaming server experience",
-				path: "/solutions/gaming",
-				image: "/images/gaming.jpg",
-			},
-			{
-				title: "For Business",
-				description: "Professional tools for business servers",
-				path: "/solutions/business",
-				image: "/images/business.jpg",
-			},
-		],
-	},
-	{
-		name: "Plugins",
-		path: "/plugins",
-		features: [
-			{
-				title: "Music Player",
-				description: "High quality music streaming for your server",
-			},
-			{
-				title: "Leveling System",
-				description: "Engage members with XP and levels",
-			},
-		],
-	},
-	{
-		name: "Documentation",
-		path: "/docs",
-		features: [
-			{
-				title: "Getting Started",
-				description: "Learn how to set up and configure your bot",
-			},
-			{
-				title: "API Reference",
-				description: "Detailed documentation of all available commands",
-			},
-		],
-	},
-];
+import type { NavSection } from "@/types/navigation";
+import { ExpandedMenu } from "./navigation/expanded-menu";
+import { navigationConfig } from "./navigation/config";
+import { useNav } from "@/hooks/use-nav";
 
 export const Header = () => {
-	const [activeNav, setActiveNav] = useState<NavItem | null>(null);
-	const [isKeyboardNavigation, setIsKeyboardNavigation] = useState(false);
-	const [isMouseInteraction, setIsMouseInteraction] = useState(false);
-	const [focusedNavIndex, setFocusedNavIndex] = useState(-1);
-	const [focusedMenuIndex, setFocusedMenuIndex] = useState(-1);
-	const [isInExpandedMenu, setIsInExpandedMenu] = useState(false);
-	const [contentDimensions, setContentDimensions] = useState({
-		width: 0,
-		height: 0,
-	});
-	const [isMounted, setIsMounted] = useState(false);
+	const {
+		activeNav,
+		isInExpandedMenu,
+		isKeyboardNavigation,
+		isMouseInteraction,
+		isMounted,
+		setActiveNav,
+		setFocusedNavIndex,
+		setFocusedMenuIndex,
+		setIsInExpandedMenu,
+		setIsKeyboardNavigation,
+		setIsMouseInteraction,
+	} = useNav();
 
-	const contentRef = useRef<HTMLDivElement>(null);
 	const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const botName = process.env.NEXT_PUBLIC_BOT_NAME || "";
 	const { user } = useAuth();
 
-	useEffect(() => {
-		setIsMounted(true);
-	}, []);
-
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (["ArrowDown", "ArrowUp", "Escape"].includes(e.key)) {
-				e.preventDefault();
-			}
-
-			if (isMouseInteraction) {
-				setIsKeyboardNavigation(false);
-				setActiveNav(null);
-				setIsMouseInteraction(false);
-				return;
-			}
-
-			if (e.key === "ArrowDown") {
-				setIsKeyboardNavigation(true);
-
-				if (!activeNav && focusedNavIndex !== -1) {
-					setActiveNav(navigationItems[focusedNavIndex]);
-					setIsInExpandedMenu(true);
-					setFocusedMenuIndex(0);
-					scrollToMenuItem(0);
-					return;
-				}
-
-				if (!isInExpandedMenu && activeNav) {
-					setIsInExpandedMenu(true);
-					setFocusedMenuIndex(0);
-					scrollToMenuItem(0);
-				} else if (isInExpandedMenu && activeNav?.features) {
-					const newIndex = Math.min(
-						focusedMenuIndex + 1,
-						activeNav.features.length - 1,
-					);
-					setFocusedMenuIndex(newIndex);
-					scrollToMenuItem(newIndex);
-				}
-			} else if (e.key === "ArrowUp") {
-				setIsKeyboardNavigation(true);
-
-				if (isInExpandedMenu) {
-					if (focusedMenuIndex <= 0) {
-						setIsInExpandedMenu(false);
-						setFocusedMenuIndex(-1);
-						const navButton = document.querySelector(
-							`[data-nav-button="${focusedNavIndex}"]`,
-						) as HTMLElement;
-						navButton?.focus();
-					} else {
-						const newIndex = focusedMenuIndex - 1;
-						setFocusedMenuIndex(newIndex);
-						scrollToMenuItem(newIndex);
-					}
-				}
-			} else if (e.key === "Escape") {
-				setActiveNav(null);
-				setFocusedNavIndex(-1);
-				setIsInExpandedMenu(false);
-				setFocusedMenuIndex(-1);
-				setIsKeyboardNavigation(false);
-			}
-
-			if (e.key === "Tab" && isInExpandedMenu) {
-				e.preventDefault();
-				const itemsCount = activeNav?.features?.length || 0;
-				if (itemsCount === 0) return;
-
-				if (e.shiftKey) {
-					setFocusedMenuIndex((prev) => (prev - 1 + itemsCount) % itemsCount);
-				} else {
-					setFocusedMenuIndex((prev) => (prev + 1) % itemsCount);
-				}
-				scrollToMenuItem(focusedMenuIndex);
-			}
-		};
-
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [
-		activeNav,
-		focusedNavIndex,
-		focusedMenuIndex,
-		isInExpandedMenu,
-		isMouseInteraction,
-	]);
-
-	useEffect(() => {
-		const observer = new ResizeObserver((entries) => {
-			if (!entries.length) return;
-			const entry = entries[0];
-			const { width, height } = entry.contentRect;
-			setContentDimensions({
-				width: Math.round(width),
-				height: Math.round(height),
-			});
-		});
-
-		if (contentRef.current) {
-			observer.observe(contentRef.current);
-		}
-
-		return () => observer.disconnect();
-	}, []);
-
-	useEffect(() => {
-		if (activeNav?.features) {
-			requestAnimationFrame(() => {
-				requestAnimationFrame(() => {
-					requestAnimationFrame(() => {
-						if (contentRef.current) {
-							const rect = contentRef.current.getBoundingClientRect();
-							setContentDimensions({
-								width: Math.round(rect.width),
-								height: Math.round(rect.height),
-							});
-						}
-					});
-				});
-			});
-		}
-	}, [activeNav]);
-
-	const handleNavEnter = (item: NavItem) => {
+	const handleNavEnter = (item: NavSection) => {
 		setIsKeyboardNavigation(false);
 		setIsMouseInteraction(true);
 
+		// Force clear any existing close timeouts
 		if (closeTimeoutRef.current) {
 			clearTimeout(closeTimeoutRef.current);
 			closeTimeoutRef.current = null;
 		}
+
+		// Immediately show the menu
 		setActiveNav(item);
+		setIsInExpandedMenu(true);
 	};
 
 	const handleNavLeave = () => {
 		setIsMouseInteraction(false);
 		if (!isKeyboardNavigation) {
-			closeTimeoutRef.current = setTimeout(() => {
-				setActiveNav(null);
-			}, 100);
+			// Add delay to allow time to move to expanded menu or another nav item
+			setTimeout(() => {
+				const expandedMenu = document.querySelector("[data-menu-container]");
+				const navButtons = document.querySelector(":hover[data-nav-button]");
+
+				// Only close if we're not hovering either the menu or any nav button
+				if (!expandedMenu?.matches(":hover") && !navButtons) {
+					setActiveNav(null);
+					setIsInExpandedMenu(false);
+				}
+			}, 50);
 		}
 	};
 
-	const handleMenuEnter = () => {
-		if (closeTimeoutRef.current) {
-			clearTimeout(closeTimeoutRef.current);
-			closeTimeoutRef.current = null;
-		}
-		if (!isKeyboardNavigation) {
-			setIsMouseInteraction(true);
-		}
-	};
-
-	const handleMenuLeave = () => {
-		if (!isKeyboardNavigation) {
-			closeTimeoutRef.current = setTimeout(() => {
-				setActiveNav(null);
-			}, 100);
-		}
-	};
-
-	const scrollToMenuItem = (index: number) => {
-		setTimeout(() => {
-			const menuItem = document.querySelector(
-				`[data-menu-item="${index}"]`,
-			) as HTMLElement;
-			menuItem?.focus();
-			menuItem?.scrollIntoView({ block: "nearest" });
-		}, 0);
-	};
-
-	const handleNavFocus = (item: NavItem, index: number) => {
+	const handleNavFocus = (item: NavSection, index: number) => {
 		if (isMouseInteraction) return;
 		setIsKeyboardNavigation(true);
 		setIsMouseInteraction(false);
@@ -323,7 +88,7 @@ export const Header = () => {
 				relatedTarget.getAttribute("data-nav-button") || "-1",
 			);
 			if (newIndex >= 0) {
-				setActiveNav(navigationItems[newIndex]);
+				setActiveNav(navigationConfig[newIndex]);
 				setFocusedNavIndex(newIndex);
 				setIsInExpandedMenu(false);
 			}
@@ -339,7 +104,7 @@ export const Header = () => {
 	if (!isMounted) return null;
 
 	return (
-		<header className="fixed w-full top-0 pt-2 sm:pt-4 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+		<header className="fixed w-full top-0 py-1 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
 			{/* Progressive Blur Overlay */}
 			<div className="absolute hidden inset-0  pointer-events-none transform scale-y-[-1]">
 				{/* Layer 1 (backdrop-blur-[1px]) – oryginalne: 0, 12.5, 25, 37.5 */}
@@ -429,17 +194,17 @@ export const Header = () => {
 					</div>
 
 					<div className="hidden lg:flex items-center">
-						{navigationItems.map((item) => (
+						{navigationConfig.map((item, index) => (
 							<Button
 								key={item.name}
 								size="lg"
 								variant="link"
 								className="relative px-4"
-								data-nav-item={item.name}
+								data-nav-button={index}
 								tabIndex={0}
 								onMouseEnter={() => handleNavEnter(item)}
 								onMouseLeave={handleNavLeave}
-								onFocus={() => handleNavFocus(item, 0)}
+								onFocus={() => handleNavFocus(item, index)}
 								onClick={() => setActiveNav(item)}
 								onBlur={handleNavBlur}
 							>
@@ -524,7 +289,15 @@ export const Header = () => {
 			</div>
 
 			{/* Expanded Navigation Menu */}
-			<div className="fixed inset-x-0 top-0 h-screen z-30 pointer-events-none">
+			<ExpandedMenu
+				section={activeNav ?? navigationConfig[0]}
+				isOpen={isInExpandedMenu}
+				onClose={() => {
+					setActiveNav(null);
+					setIsInExpandedMenu(false);
+				}}
+			/>
+			{/* <div className="fixed inset-x-0 top-0 h-screen z-30 pointer-events-none">
 				{activeNav?.features && (
 					<div
 						className="fixed left-1/2 top-20 -translate-x-1/2 z-40 pointer-events-auto"
@@ -844,7 +617,7 @@ export const Header = () => {
 						)}
 					</div>
 				)}
-			</div>
+			</div> */}
 		</header>
 	);
 };

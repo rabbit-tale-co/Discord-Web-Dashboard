@@ -35,7 +35,7 @@ export const NavItemButton: React.FC<NavItemButtonProps> = ({
 		<Button
 			size="lg"
 			variant="link"
-			className="relative rounded-full focus:outline-none focus:ring-2 focus:ring-primary"
+			className="relative focus:outline-none focus:ring-2 focus:ring-primary"
 			data-nav-item={index}
 			tabIndex={0}
 			onMouseEnter={onMouseEnter}
