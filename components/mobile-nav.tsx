@@ -12,7 +12,7 @@ import {
 import { User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as Icon from "@/components/icons";
-import type { NavItem } from "@/types";
+import type { NavItem } from "@/types/navigation";
 import type { UserSession } from "@/app/authContext";
 import { useAuth } from "@/app/authContext";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
