@@ -15,10 +15,11 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarMenuSub,
-} from "@/components/ui/sidebar";
+	SidebarMenuBadge,
+} from "@/components/navigation/sidebar";
 import type { NavSection } from "@/types/navigation";
 import * as Icon from "@/components/icons";
-import { Badge } from "@/components/ui/badge";
+import { navigationConfig } from "../navigation/config";
 
 // Resolve icon on client side
 const resolveIcon = (iconName: string) => {
@@ -68,10 +69,7 @@ export function NavMain({ section }: { section: NavSection }) {
 													</React.Fragment>
 												)} */}
 												{category.title}
-												<Badge
-													variant={"outline"}
-													className="absolute right-1 top-1/2 -translate-y-1/2"
-												>
+												<SidebarMenuBadge className="absolute right-1 top-1/2 -translate-y-1/2">
 													<span className="text-xs text-muted-foreground">
 														{/* TODO: Active/Inactive number */}
 														{(() => {
@@ -82,7 +80,7 @@ export function NavMain({ section }: { section: NavSection }) {
 															return `${active}/${category.items.length}`;
 														})()}
 													</span>
-												</Badge>
+												</SidebarMenuBadge>
 											</SidebarMenuButton>
 										</CollapsibleTrigger>
 										<CollapsibleContent className="ml-2.5">
@@ -90,7 +88,7 @@ export function NavMain({ section }: { section: NavSection }) {
 												{category.items.map((item) => (
 													<SidebarMenuItem key={item.title}>
 														<SidebarMenuButton asChild>
-															<Link href={item.url}>
+															<Link href={item.url || ""}>
 																{/* {item.iconName &&
 																	(() => {
 																		const ItemIcon = resolveIcon(item.iconName);
@@ -113,4 +111,67 @@ export function NavMain({ section }: { section: NavSection }) {
 			</SidebarMenu>
 		</SidebarGroup>
 	);
+}
+
+export function NavMainMobile() {
+	return (
+		<SidebarGroup>
+			<SidebarMenu>
+        {navigationConfig.map((section) => (
+          <Collapsible
+            key={section.title}
+            className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
+          >
+            <CollapsibleTrigger asChild>
+              <SidebarMenuButton className="w-full">
+                <ChevronRight className="transition-transform duration-150" />
+                {section.iconName && (
+                  <React.Fragment>
+                    {(() => {
+                      const SectionIcon = resolveIcon(section.iconName);
+                      return SectionIcon && <SectionIcon size={22} />;
+                    })()}
+                  </React.Fragment>
+                )}
+                {section.title}
+              </SidebarMenuButton>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <SidebarMenuSub>
+                {section.categories.map((category) => (
+                  <React.Fragment key={category.title}>
+                    {/* Only show items, skip category headers */}
+                    {category.items.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton asChild>
+                          <Link href={item.url || ""}>
+                            {item.iconName && (
+                              <React.Fragment>
+                                {(() => {
+                                  const ItemIcon = resolveIcon(item.iconName);
+                                  return ItemIcon && <ItemIcon size={18} />;
+                                })()}
+                              </React.Fragment>
+                            )}
+                            <span className="flex flex-col">
+                              <span>{item.title}</span>
+                              {item.description && (
+                                <span className="text-xs text-muted-foreground line-clamp-1">
+                                  {item.description}
+                                </span>
+                              )}
+                            </span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </SidebarMenuSub>
+            </CollapsibleContent>
+          </Collapsible>
+        ))}
+      </SidebarMenu>
+    </SidebarGroup>
+  );
 }

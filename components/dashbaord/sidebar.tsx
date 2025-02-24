@@ -6,11 +6,12 @@ import {
 	SidebarFooter,
 	SidebarHeader,
 	SidebarRail,
-} from "@/components/ui/sidebar";
+	useSidebar,
+} from "@/components/navigation/sidebar";
 import { navigationConfig } from "../navigation/config";
 import { NavUser } from "./nav-user";
 
-import { NavMain } from "./nav-main";
+import { NavMain, NavMainMobile } from "./nav-main";
 import { TeamSwitcher } from "./team-switcher";
 
 const plugins: NavSection = {
@@ -20,7 +21,7 @@ const plugins: NavSection = {
 		navigationConfig.find((item) => item.title === "Plugins")?.categories || [],
 };
 
-const data = {
+export const data = {
 	user: {
 		name: "shadcn",
 		email: "m@example.com",
@@ -79,6 +80,24 @@ export function DashboardSidebar({
 				<NavUser user={data.user} />
 			</SidebarFooter>
 			<SidebarRail />
+		</Sidebar>
+	);
+}
+
+export function SidebarMobile({
+	...props
+}: React.ComponentProps<typeof Sidebar>) {
+	return (
+		<Sidebar {...props} target="mobile">
+			<SidebarHeader>
+				<TeamSwitcher teams={data.teams} />
+			</SidebarHeader>
+			<SidebarContent>
+				<NavMainMobile section={data.plugins} />
+			</SidebarContent>
+			<SidebarFooter>
+				<NavUser user={data.user} />
+			</SidebarFooter>
 		</Sidebar>
 	);
 }

@@ -17,7 +17,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 	useSidebar,
-} from "@/components/ui/sidebar";
+} from "@/components/navigation/sidebar";
 import * as Icon from "@/components/icons";
 
 interface Team {

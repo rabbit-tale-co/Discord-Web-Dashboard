@@ -151,19 +151,30 @@ function SidebarProvider({
 	);
 }
 
+interface SidebarProps extends React.ComponentProps<"div"> {
+	side?: "left" | "right";
+	variant?: "sidebar" | "floating" | "inset";
+	collapsible?: "offcanvas" | "icon" | "none";
+	target?: "desktop" | "mobile" | "both";
+}
+
 function Sidebar({
 	side = "left",
 	variant = "sidebar",
 	collapsible = "offcanvas",
+	target = "both",
 	className,
 	children,
 	...props
-}: React.ComponentProps<"div"> & {
-	side?: "left" | "right";
-	variant?: "sidebar" | "floating" | "inset";
-	collapsible?: "offcanvas" | "icon" | "none";
-}) {
+}: SidebarProps) {
 	const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+
+	if (
+		(target === "mobile" && !isMobile) ||
+		(target === "desktop" && isMobile)
+	) {
+		return null;
+	}
 
 	if (collapsible === "none") {
 		return (
@@ -181,6 +192,9 @@ function Sidebar({
 	}
 
 	if (isMobile) {
+		// Don't render mobile sheet if target is 'desktop'
+		if (target === "desktop") return null;
+
 		return (
 			<Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
 				<SheetHeader className="sr-only">
@@ -204,6 +218,9 @@ function Sidebar({
 			</Sheet>
 		);
 	}
+
+	// Don't render desktop sidebar if target is 'mobile'
+	if (target === "mobile") return null;
 
 	return (
 		<div

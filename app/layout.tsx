@@ -5,6 +5,8 @@ import "./globals.css";
 import { AuthProvider } from "@/app/authContext";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SidebarProvider } from "@/components/navigation/sidebar";
+import { SidebarMobile } from "@/components/dashbaord/sidebar";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -83,7 +85,12 @@ export default function RootLayout({
 						</div>
 					}
 				>
-					<AuthProvider>{children}</AuthProvider>
+					<AuthProvider>
+						<SidebarProvider defaultOpen={false}>
+							<SidebarMobile className="z-100" />
+							<div className="relative flex flex-col w-full">{children}</div>
+						</SidebarProvider>
+					</AuthProvider>
 				</Suspense>
 				<Toaster position="top-center" richColors />
 			</body>

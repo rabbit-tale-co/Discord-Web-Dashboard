@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/navigation/sidebar";
 import { DashboardSidebar } from "@/components/dashbaord/sidebar";
 import { DashboardHeader } from "@/components/dashbaord/header";
 import { Footer } from "@/components/footer";

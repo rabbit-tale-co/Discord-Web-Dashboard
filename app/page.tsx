@@ -12,7 +12,7 @@ import { toast } from "sonner";
 const DISCORD_OAUTH_URL = `https://discord.com/api/oauth2/authorize?client_id=${
 	process.env.NEXT_PUBLIC_BOT_ID
 }&redirect_uri=${encodeURIComponent(
-	process.env.NEXT_PUBLIC_DASHBOARD_URL + "/api/auth/callback",
+	`${process.env.NEXT_PUBLIC_DASHBOARD_URL}/api/auth/callback`,
 )}&response_type=code&scope=${encodeURIComponent("identify email guilds")}`;
 
 function HomeContent() {
