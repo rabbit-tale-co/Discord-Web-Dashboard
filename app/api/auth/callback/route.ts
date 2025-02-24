@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 		if (!tokenResponse.ok) {
 			const errorText = await tokenResponse.text();
 			console.error("Token exchange failed:", errorText);
-			throw new Error('Token exchange failed');
+			throw new Error("Token exchange failed");
 		}
 
 		const data = await tokenResponse.json();
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 		if (!userResponse.ok) {
 			const errorText = await userResponse.text();
 			console.error("User data fetch failed:", errorText);
-			throw new Error('Failed to fetch user data');
+			throw new Error("Failed to fetch user data");
 		}
 
 		const userData = await userResponse.json();
@@ -70,11 +70,11 @@ export async function GET(request: Request) {
 
 		// Create response with redirect
 		const response = NextResponse.redirect(
-			new URL("/", process.env.NEXT_PUBLIC_DASHBOARD_URL || request.url)
+			new URL("/", process.env.NEXT_PUBLIC_DASHBOARD_URL || request.url),
 		);
 
 		// Set cookies using the cookies() API
-		const cookiesStore = cookies();
+		const cookiesStore = await cookies();
 
 		// Set access token cookie
 		cookiesStore.set("access_token", data.access_token, {
@@ -103,9 +103,12 @@ export async function GET(request: Request) {
 
 		return response;
 	} catch (error) {
-		console.error('Auth error:', error);
+		console.error("Auth error:", error);
 		return NextResponse.redirect(
-			new URL("/?error=auth_failed", process.env.NEXT_PUBLIC_DASHBOARD_URL || request.url)
+			new URL(
+				"/?error=auth_failed",
+				process.env.NEXT_PUBLIC_DASHBOARD_URL || request.url,
+			),
 		);
 	}
 }

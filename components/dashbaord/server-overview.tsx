@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Users, MessageSquare, Hash, Crown } from "lucide-react";
 import avatarUrl from "@/lib/is-gif";
 import type { GuildData } from "@/hooks/use-guilds";
-import { useGetGuildOwner } from "@/hooks/use-guilds";
 import { useGetUser } from "@/hooks/use-user";
 
 interface GuildOverviewProps {
@@ -62,7 +61,7 @@ export function ServerOverview({ guildData }: GuildOverviewProps) {
 									: "Owner not found"}
 						</div>
 					</div>
-					<div className="ml-auto text-right">
+					<div className="ml-auto text-right uppercase">
 						{guild_details.region}
 						<div className="flex flex-wrap justify-end gap-1 mt-2">
 							{guild_details.features.includes("COMMUNITY") && (
