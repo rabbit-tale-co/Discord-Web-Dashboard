@@ -16,12 +16,7 @@ export default function DashboardLayout({
 }>) {
 	return (
 		<div className="flex h-screen w-screen overflow-hidden">
-			<SidebarProvider
-				style={{
-					"--sidebar-width": "17rem",
-					"--sidebar-width-mobile": "20rem",
-				}}
-			>
+			<SidebarProvider>
 				<DashboardSidebar />
 
 				{/* <SidebarTrigger /> */}
