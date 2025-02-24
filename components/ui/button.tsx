@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-	"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[background,color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 focus-visible:ring-4 focus-visible:outline-1 aria-invalid:focus-visible:ring-0 rounded-full duration-200", //[&_svg:not([class*='size-'])]:size-4
+	"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[background,color,box-shadow] [&_svg]:pointer-events-none [&_svg]:shrink-0 ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 focus-visible:ring-4 focus-visible:outline-1 aria-invalid:focus-visible:ring-0 rounded-full duration-200", //[&_svg:not([class*='size-'])]:size-4
 	{
 		variants: {
 			variant: {
@@ -13,7 +13,7 @@ const buttonVariants = cva(
 				discord: "bg-discord-bg text-discord-foreground hover:bg-discord-bg/90",
 				destructive:
 					"bg-destructive text-destructive-foreground hover:bg-destructive/90",
-				outline: "border border-input bg-transparent text-primary-foreground",
+				outline: "border border-input bg-transparent text-primary",
 				secondary:
 					"bg-secondary text-secondary-foreground hover:bg-secondary/80",
 				ghost: "hover:bg-accent hover:text-accent-foreground",
@@ -42,17 +42,23 @@ function Button({
 	variant,
 	size,
 	asChild = false,
+	disabled,
 	...props
 }: React.ComponentProps<"button"> &
 	VariantProps<typeof buttonVariants> & {
 		asChild?: boolean;
+		disabled?: boolean;
 	}) {
 	const Comp = asChild ? Slot : "button";
 
 	return (
 		<Comp
 			data-slot="button"
-			className={cn(buttonVariants({ variant, size, className }))}
+			disabled={disabled}
+			className={cn(
+				buttonVariants({ variant, size, className }),
+				disabled && "cursor-not-allowed opacity-50",
+			)}
 			{...props}
 		/>
 	);

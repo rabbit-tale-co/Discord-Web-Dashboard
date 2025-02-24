@@ -21,7 +21,7 @@ export default function DashboardLayout({
 
 				{/* <SidebarTrigger /> */}
 				<div className="flex flex-col w-full">
-					<DashboardHeader />
+					{/* <DashboardHeader /> */}
 					{children}
 				</div>
 				{/* <Footer /> */}

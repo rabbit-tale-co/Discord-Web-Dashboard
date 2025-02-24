@@ -10,9 +10,14 @@ import { SidebarTrigger } from "../ui/sidebar";
 
 export function DashboardHeader() {
 	const { id } = useParams();
-	const { guild } = useGuild(id as string);
-	const guildIcon = guild?.icon
-		? avatarUrl(guild.id, guild.icon, 128, false)
+	const { guildData } = useGuild(id as string);
+	const guildIcon = guildData?.guild_details.icon
+		? avatarUrl(
+				guildData.guild_details.id,
+				guildData.guild_details.icon,
+				128,
+				false,
+			)
 		: "/images/discord-logo.png";
 
 	return (
@@ -22,9 +27,13 @@ export function DashboardHeader() {
 					<div className="flex items-center gap-2">
 						<Avatar>
 							<AvatarImage src={guildIcon} className="rounded-full size-10" />
-							<AvatarFallback>{guild?.name.slice(0, 2)}</AvatarFallback>
+							<AvatarFallback>
+								{guildData?.guild_details.name.slice(0, 2)}
+							</AvatarFallback>
 						</Avatar>
-						<h1 className="text-2xl font-bold">{guild?.name}</h1>
+						<h1 className="text-2xl font-bold">
+							{guildData?.guild_details.name}
+						</h1>
 					</div>
 					<Button variant={"secondary"} size={"lg"}>
 						Settings
