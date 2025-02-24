@@ -37,6 +37,9 @@ export const useGuilds = () => {
 };
 
 export interface GuildData {
+	category_count: number;
+	text_channel_count: number;
+	voice_channel_count: number;
 	guild_details: {
 		id: string;
 		name: string;
@@ -50,14 +53,13 @@ export interface GuildData {
 		premium_subscription_count?: number;
 		region?: string;
 	};
-	text_channel_count: number;
-	voice_channel_count: number;
 	roles: {
 		id: string;
 		name: string;
 		color: number;
 		position: number;
 	}[];
+	rolesCount: number;
 }
 
 export function useGuild(id: string) {
