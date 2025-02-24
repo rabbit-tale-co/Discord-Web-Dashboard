@@ -196,7 +196,7 @@ export const Header = () => {
 					<div className="hidden lg:flex items-center">
 						{navigationConfig.map((item, index) => (
 							<Button
-								key={item.name}
+								key={item.title}
 								size="lg"
 								variant="link"
 								className="relative px-4"
@@ -208,7 +208,7 @@ export const Header = () => {
 								onClick={() => setActiveNav(item)}
 								onBlur={handleNavBlur}
 							>
-								{item.name}
+								{item.title}
 							</Button>
 						))}
 					</div>

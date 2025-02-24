@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { DashboardSidebar } from "@/components/dashbaord/sidebar";
+import { DashboardHeader } from "@/components/dashbaord/header";
+import { Footer } from "@/components/footer";
 
 export const metadata: Metadata = {
 	title: "Discord Bot Dashboard",
@@ -13,13 +15,21 @@ export default function DashboardLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<div className="flex h-screen w-screen">
-			<SidebarProvider>
+		<div className="flex h-screen w-screen overflow-hidden">
+			<SidebarProvider
+				style={{
+					"--sidebar-width": "17rem",
+					"--sidebar-width-mobile": "20rem",
+				}}
+			>
 				<DashboardSidebar />
-				<div className="w-3/4 bg-white">
-					<SidebarTrigger />
+
+				{/* <SidebarTrigger /> */}
+				<div className="flex flex-col w-full">
+					<DashboardHeader />
 					{children}
 				</div>
+				{/* <Footer /> */}
 			</SidebarProvider>
 		</div>
 	);

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useAuth } from "../authContext";
 import Image from "next/image";
 import Link from "next/link";
 import React from "react";
@@ -7,84 +9,56 @@ import * as Icon from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { Skeleton } from "@/components/ui/skeleton";
+import avatarUrl from "@/lib/is-gif";
 
 interface Server {
 	id: string;
 	name: string;
-	avatar: string;
-	hasBot: boolean;
-	memberCount: number;
-	hasPremium: boolean;
+	icon: string | null;
+	features: string[];
+	approximate_member_count?: number;
+	premium_tier: number;
+	has_bot: boolean;
 }
 
-const servers: Server[] = [
-	{
-		id: "1",
-		name: "Gaming Community",
-		avatar: "https://picsum.photos/800/600?random=1",
-		hasBot: true,
-		memberCount: 1234,
-		hasPremium: true,
-	},
-	{
-		id: "2",
-		name: "Development Hub",
-		avatar: "https://picsum.photos/800/600?random=2",
-		hasBot: false,
-		memberCount: 567,
-		hasPremium: false,
-	},
-	{
-		id: "3",
-		name: "Art Gallery",
-		avatar: "https://picsum.photos/800/600?random=3",
-		hasBot: true,
-		memberCount: 890,
-		hasPremium: false,
-	},
-	{
-		id: "4",
-		name: "Music Lounge",
-		avatar: "https://picsum.photos/800/600?random=4",
-		hasBot: false,
-		memberCount: 432,
-		hasPremium: false,
-	},
-	{
-		id: "5",
-		name: "Gaming Community",
-		avatar: "https://picsum.photos/800/600?random=1",
-		hasBot: true,
-		memberCount: 1234,
-		hasPremium: false,
-	},
-	{
-		id: "6",
-		name: "Development Hub",
-		avatar: "https://picsum.photos/800/600?random=2",
-		hasBot: false,
-		memberCount: 567,
-		hasPremium: false,
-	},
-	{
-		id: "7",
-		name: "Art Gallery",
-		avatar: "https://picsum.photos/800/600?random=3",
-		hasBot: true,
-		memberCount: 890,
-		hasPremium: false,
-	},
-	{
-		id: "8",
-		name: "Music Lounge",
-		avatar: "https://picsum.photos/800/600?random=4",
-		hasBot: false,
-		memberCount: 432,
-		hasPremium: false,
-	},
-];
-
 export default function Servers() {
+	const { user } = useAuth();
+	const [servers, setServers] = useState<Server[]>([]);
+	const [status, setStatus] = useState<"loading" | "error" | "success">(
+		"loading",
+	);
+
+	useEffect(() => {
+		if (user) {
+			fetch("/api/guilds")
+				.then((res) => res.json())
+				.then((data) => {
+					const serverArray = Array.isArray(data) ? data : data.guilds || [];
+					setServers(serverArray);
+					console.log("Servers data:", serverArray);
+					setStatus("success");
+				})
+				.catch((err) => {
+					console.error("Error fetching guilds:", err);
+					setServers([]);
+					setStatus("error");
+				});
+		}
+	}, [user]);
+
+	if (!user) {
+		return null;
+	}
+
+	const getServerAvatar = (server: Server) => {
+		if (!server.icon) return "/default-server-avatar.png";
+
+		const isGif = server.icon.startsWith("a_");
+		const extension = isGif ? "gif" : "webp";
+		return `https://cdn.discordapp.com/icons/${server.id}/${server.icon}.${extension}?size=512`;
+	};
+
 	return (
 		<React.Fragment>
 			<Header />
@@ -101,68 +75,108 @@ export default function Servers() {
 
 						{/* 🔹 Outer Grid */}
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-							{servers.map((server) => (
-								// 🔹 Server Card with Nested Grid
-								<div
-									key={server.id}
-									className="group relative overflow-hidden rounded-3xl bg-primary transition-all duration-300 p-1"
-								>
-									{/* Inner Grid Layout */}
-									<div className="flex flex-col gap-2">
-										{/* 🔹 Image Container */}
-										<div className="relative w-full aspect-video overflow-hidden rounded-[20px]">
-											<Image
-												src={server.avatar || "/default-server-avatar.png"}
-												alt={server.name}
-												width={900}
-												height={600}
-												className="h-full w-full object-cover object-center transition-transform duration-300 sm:group-hover:scale-105"
-											/>
-											<div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-transparent" />
-											{server.hasPremium && (
-												<Button
-													variant={"outline"}
-													size={"icon"}
-													className="absolute top-2 right-2"
-												>
-													<Icon.OutlineCrown size={20} />
-												</Button>
-											)}
-										</div>
+							{status === "loading"
+								? [...new Array(9)].map((_) => (
+										<div
+											key={`server-skeleton-${crypto.randomUUID()}`}
+											className="group relative overflow-hidden rounded-3xl bg-primary/5 transition-all duration-300 p-1"
+										>
+											<div className="flex flex-col gap-2">
+												{/* Image Container */}
+												<div className="relative w-full aspect-video overflow-hidden rounded-[20px] bg-primary/5">
+													<div className="absolute inset-0">
+														<Skeleton className="h-full w-full" />
+													</div>
+												</div>
 
-										{/* 🔹 Server Information */}
+												{/* Server Information */}
+												<div className="flex gap-2 justify-between items-end pr-2 pb-2">
+													<div className="flex flex-col gap-1 items-start max-w-[50%] pl-3">
+														<Skeleton className="h-6 w-32" />
+														<Skeleton className="h-4 w-24" />
+													</div>
 
-										<div className="flex gap-2 justify-between items-end pr-2 pb-2">
-											<div className="flex flex-col items-start max-w-[50%] pl-3">
-												<h3 className="text-lg truncate font-semibold text-white w-full">
-													{server.name}
-												</h3>
-												<p className="text-sm text-white/75 font-medium">
-													{server.memberCount.toLocaleString()} members
-												</p>
+													{/* Button Section */}
+													<Skeleton className="h-10 w-32 rounded-lg" />
+												</div>
 											</div>
-
-											{/* 🔹 Button Section */}
-											<Button
-												variant={server.hasBot ? "secondary" : "discord"}
-												size={"lg"}
-												asChild
-											>
-												<Link
-													href={server.hasBot ? `/dashboard/${server.id}` : "#"}
-												>
-													{server.hasBot ? "Configure" : "Add to Server"}
-													{server.hasBot ? (
-														<Icon.SolidArrowRight />
-													) : (
-														<Icon.SolidDiscord />
-													)}
-												</Link>
-											</Button>
 										</div>
-									</div>
-								</div>
-							))}
+									))
+								: servers.map((server) => (
+										// 🔹 Server Card with Nested Grid
+										<div
+											key={server.id}
+											className="group relative overflow-hidden rounded-3xl bg-primary transition-all duration-300 p-1"
+										>
+											{/* Inner Grid Layout */}
+											<div className="flex flex-col gap-2">
+												{/* 🔹 Image Container */}
+												<div className="relative w-full aspect-video overflow-hidden rounded-[20px]">
+													<Image
+														src={avatarUrl(
+															server.id,
+															server.icon || "",
+															1024,
+															false,
+														)}
+														alt={server.name}
+														width={900}
+														height={600}
+														className="h-full w-full object-cover object-center transition-transform duration-300 sm:group-hover:scale-105"
+													/>
+													<div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-transparent" />
+													{server.premium_tier > 0 && (
+														<Button
+															variant={"outline"}
+															size={"icon"}
+															className="absolute top-2 right-2"
+														>
+															<Icon.OutlineCrown size={20} />
+														</Button>
+													)}
+												</div>
+
+												{/* 🔹 Server Information */}
+
+												<div className="flex gap-2 justify-between items-end pr-2 pb-2">
+													<div className="flex flex-col items-start max-w-[50%] pl-3">
+														<h3 className="text-lg truncate font-semibold text-white w-full">
+															{server.name}
+														</h3>
+														<p className="text-sm text-white/75 font-medium">
+															{(
+																server.approximate_member_count || 0
+															).toLocaleString()}{" "}
+															members
+														</p>
+													</div>
+
+													{/* 🔹 Button Section */}
+													<Button
+														variant={!server.has_bot ? "discord" : "secondary"}
+														size={"lg"}
+														asChild
+													>
+														<Link
+															href={
+																!server.has_bot
+																	? `https://discord.com/api/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&permissions=8&scope=bot%20applications.commands&guild_id=${server.id}`
+																	: `/dashboard/${server.id}`
+															}
+															target={!server.has_bot ? "_blank" : undefined}
+														>
+															{!server.has_bot ? "Add to Server" : "Configure"}
+															{!server.has_bot ? (
+																<Icon.SolidDiscord />
+															) : (
+																<Icon.SolidArrowRight />
+															)}
+														</Link>
+													</Button>
+												</div>
+											</div>
+										</div>
+									))}
 						</div>
 					</div>
 				</main>

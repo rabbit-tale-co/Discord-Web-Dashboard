@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/app/authContext";
 import type { SessionData } from "@/types/index";
 import Link from "next/link";
+import avatarUrl from "@/lib/is-gif";
 // import { useEffect } from "react";
 // import { Progress } from "@/components/ui/progress";
 
@@ -42,11 +43,6 @@ export const UserAvatar = ({ user }: { user: SessionData["user"] }) => {
 	// 		}
 	// 	}
 	// }, [isMenuOpen]);
-
-	const isGif = user.avatar.startsWith("a_");
-	const avatarUrl = isGif
-		? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.gif`
-		: `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.webp`;
 
 	// const handleMouseDown = () => {
 	// 	if (!isClicked) {
@@ -90,7 +86,7 @@ export const UserAvatar = ({ user }: { user: SessionData["user"] }) => {
 					className="cursor-pointer group max-md:hidden"
 				>
 					<AvatarImage
-						src={avatarUrl}
+						src={avatarUrl(user.id, user.avatar)}
 						className="group-hover:scale-110 transition-all duration-300"
 					/>
 					<AvatarFallback>{user.username.slice(0, 2)}</AvatarFallback>

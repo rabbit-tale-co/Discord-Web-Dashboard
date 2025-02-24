@@ -1,7 +1,13 @@
 // ExpandedMenu.tsx
 import React from "react";
 import { useEffect, useState, useRef } from "react";
-import type { NavSection } from "@/types/navigation";
+import type {
+	NavSection,
+	Item,
+	SmallItem,
+	LargeItem,
+	NavItem,
+} from "@/types/navigation";
 import { FeatureCard } from "./feature-card";
 import { useNav } from "@/hooks/use-nav";
 
@@ -70,8 +76,15 @@ export const ExpandedMenu: React.FC<ExpandedMenuProps> = ({
 		}
 	};
 
-	const sectionMap = {
-		Features: FeaturesSection,
+	const sectionMap: Record<
+		string,
+		React.FC<{
+			section: NavSection;
+			isInExpandedMenu: boolean;
+			focusedMenuIndex: number;
+		}>
+	> = {
+		Plugins: FeaturesSection,
 		Solutions: SolutionsSection,
 		Developers: DevelopersSection,
 		Company: CompanySection,
@@ -99,8 +112,7 @@ export const ExpandedMenu: React.FC<ExpandedMenuProps> = ({
 				<div ref={contentRef} className="relative w-max">
 					<header className="fade flex gap-2 animate-fadeSm">
 						{(() => {
-							const SectionComponent =
-								sectionMap[section.name as keyof typeof sectionMap];
+							const SectionComponent = sectionMap[section.title];
 							return SectionComponent ? (
 								<SectionComponent
 									section={section}
@@ -150,35 +162,44 @@ const FeaturesSection = ({
 	section: NavSection;
 	isInExpandedMenu: boolean;
 	focusedMenuIndex: number;
-}) => (
-	<React.Fragment>
-		<ul className="flex w-full max-w-[420px] flex-col gap-2">
-			{section.features
-				.filter((f) => f.type === "small")
-				.map((feature, index) => (
-					<FeatureCard
-						key={feature.title}
-						feature={feature}
-						isFocused={isInExpandedMenu && focusedMenuIndex === index}
-						data-menu-item={index}
-					/>
-				))}
-		</ul>
-		<div className="flex gap-2">
-			{section.features
-				.filter((f) => f.type === "large")
-				.slice(0, 2)
-				.map((feature, index) => (
-					<FeatureCard
-						key={feature.title}
-						feature={feature}
-						isFocused={false}
-						data-menu-item={index + section.features.length}
-					/>
-				))}
-		</div>
-	</React.Fragment>
-);
+}) => {
+	// Add null check and provide default empty array
+	const items =
+		section.categories?.reduce<NavItem[]>((acc, category) => {
+			acc.push(...(category.items || []));
+			return acc;
+		}, []) || [];
+
+	return (
+		<React.Fragment>
+			<ul className="flex w-full max-w-[420px] flex-col gap-2">
+				{items
+					.filter((f): f is NavItem => f.type === "small")
+					.map((item, index) => (
+						<FeatureCard
+							key={item.title}
+							feature={item}
+							isFocused={isInExpandedMenu && focusedMenuIndex === index}
+							data-menu-item={index}
+						/>
+					))}
+			</ul>
+			<div className="flex gap-2">
+				{items
+					.filter((f): f is NavItem => f.type === "large")
+					.slice(0, 2)
+					.map((item, index) => (
+						<FeatureCard
+							key={item.title}
+							feature={item}
+							isFocused={false}
+							data-menu-item={index + items.length}
+						/>
+					))}
+			</div>
+		</React.Fragment>
+	);
+};
 
 const SolutionsSection = ({
 	section,
@@ -188,23 +209,31 @@ const SolutionsSection = ({
 	section: NavSection;
 	isInExpandedMenu: boolean;
 	focusedMenuIndex: number;
-}) => (
-	<React.Fragment>
-		<div className="flex gap-2">
-			{section.features
-				.filter((f) => f.type === "large")
-				.slice(0, 3)
-				.map((feature, index) => (
-					<FeatureCard
-						key={feature.title}
-						feature={feature}
-						isFocused={false}
-						data-menu-item={index}
-					/>
-				))}
-		</div>
-	</React.Fragment>
-);
+}) => {
+	const items =
+		section.categories?.reduce<NavItem[]>((acc, category) => {
+			acc.push(...(category.items || []));
+			return acc;
+		}, []) || [];
+
+	return (
+		<React.Fragment>
+			<div className="flex gap-2">
+				{items
+					.filter((f) => f.type === "large")
+					.slice(0, 3)
+					.map((item, index) => (
+						<FeatureCard
+							key={item.title}
+							feature={item}
+							isFocused={false}
+							data-menu-item={index}
+						/>
+					))}
+			</div>
+		</React.Fragment>
+	);
+};
 
 const DevelopersSection = ({
 	section,
@@ -214,37 +243,44 @@ const DevelopersSection = ({
 	section: NavSection;
 	isInExpandedMenu: boolean;
 	focusedMenuIndex: number;
-}) => (
-	<React.Fragment>
-		<ul className="flex w-full max-w-[420px] flex-col gap-2">
-			{section.features
-				.filter((f) => f.type === "small")
-				.map((feature, index) => (
-					<FeatureCard
-						key={feature.title}
-						feature={feature}
-						isFocused={isInExpandedMenu && focusedMenuIndex === index}
-						data-menu-item={index}
-					/>
-				))}
-		</ul>
-		<div className="flex gap-2">
-			{section.features
-				.filter((f) => f.type === "large")
-				.slice(0, 1)
-				.map((feature, index) => (
-					<FeatureCard
-						key={feature.title}
-						feature={feature}
-						isFocused={false}
-						data-menu-item={
-							index + section.features.filter((f) => f.type === "small").length
-						}
-					/>
-				))}
-		</div>
-	</React.Fragment>
-);
+}) => {
+	const items =
+		section.categories?.reduce<NavItem[]>((acc, category) => {
+			acc.push(...(category.items || []));
+			return acc;
+		}, []) || [];
+	return (
+		<React.Fragment>
+			<ul className="flex w-full max-w-[420px] flex-col gap-2">
+				{items
+					.filter((f) => f.type === "small")
+					.map((item, index) => (
+						<FeatureCard
+							key={item.title}
+							feature={item}
+							isFocused={isInExpandedMenu && focusedMenuIndex === index}
+							data-menu-item={index}
+						/>
+					))}
+			</ul>
+			<div className="flex gap-2">
+				{items
+					.filter((f) => f.type === "large")
+					.slice(0, 1)
+					.map((item, index) => (
+						<FeatureCard
+							key={item.title}
+							feature={item}
+							isFocused={false}
+							data-menu-item={
+								index + items.filter((f) => f.type === "small").length
+							}
+						/>
+					))}
+			</div>
+		</React.Fragment>
+	);
+};
 
 const CompanySection = ({
 	section,
@@ -254,52 +290,57 @@ const CompanySection = ({
 	section: NavSection;
 	isInExpandedMenu: boolean;
 	focusedMenuIndex: number;
-}) => (
-	<React.Fragment>
-		<div className="flex gap-2">
-			{/* Pierwsza duża karta (blog) */}
-			<div className="flex flex-col gap-2 flex-1">
-				{section.features
-					.filter((f) => f.type === "large")
-					.slice(0, 1)
-					.map((feature, index) => (
-						<FeatureCard
-							key={feature.title}
-							feature={feature}
-							isFocused={false}
-							data-menu-item={index}
-						/>
-					))}
-			</div>
-			{/* Druga kolumna z kartą X i About */}
-			<div className="flex flex-col gap-2">
-				<div className="flex-1">
-					{section.features
+}) => {
+	const items =
+		section.categories?.reduce<NavItem[]>((acc, category) => {
+			acc.push(...(category.items || []));
+			return acc;
+		}, []) || [];
+	return (
+		<React.Fragment>
+			<div className="flex gap-2">
+				<div className="flex flex-col gap-2 flex-1">
+					{items
 						.filter((f) => f.type === "large")
-						.slice(1, 2)
-						.map((feature, index) => (
+						.slice(0, 1)
+						.map((item, index) => (
 							<FeatureCard
-								key={feature.title}
-								feature={{
-									...feature,
-									minHeight: "100%", // Wypełnij dostępną wysokość
-								}}
+								key={item.title}
+								feature={item}
 								isFocused={false}
-								data-menu-item={index + 1}
+								data-menu-item={index}
 							/>
 						))}
 				</div>
-				{section.features
-					.filter((f) => f.type === "small")
-					.map((feature, index) => (
-						<FeatureCard
-							key={feature.title}
-							feature={feature}
-							isFocused={isInExpandedMenu && focusedMenuIndex === index}
-							data-menu-item={index + 2}
-						/>
-					))}
+				<div className="flex flex-col gap-2">
+					<div className="flex-1">
+						{items
+							.filter((f) => f.type === "large")
+							.slice(1, 2)
+							.map((item, index) => (
+								<FeatureCard
+									key={item.title}
+									feature={{
+										...item,
+										minHeight: "100%",
+									}}
+									isFocused={false}
+									data-menu-item={index + 1}
+								/>
+							))}
+					</div>
+					{items
+						.filter((f) => f.type === "small")
+						.map((item, index) => (
+							<FeatureCard
+								key={item.title}
+								feature={item}
+								isFocused={isInExpandedMenu && focusedMenuIndex === index}
+								data-menu-item={index + 2}
+							/>
+						))}
+				</div>
 			</div>
-		</div>
-	</React.Fragment>
-);
+		</React.Fragment>
+	);
+};

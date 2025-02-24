@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 export async function GET(request: Request) {
 	const { searchParams } = new URL(request.url);
@@ -8,15 +9,14 @@ export async function GET(request: Request) {
 		return NextResponse.redirect(new URL("/?error=missing_code", request.url));
 	}
 
-	const params = new URLSearchParams();
-	params.append("client_id", process.env.NEXT_PUBLIC_BOT_ID || "");
-	params.append("client_secret", process.env.BOT_CLIENT_SECRET || "");
-	params.append("code", code);
-	params.append("grant_type", "authorization_code");
-	params.append(
-		"redirect_uri",
-		`${process.env.NEXT_PUBLIC_DASHBOARD_URL}/api/auth/callback`,
-	);
+	const params = new URLSearchParams({
+		client_id: process.env.NEXT_PUBLIC_BOT_ID || "",
+		client_secret: process.env.BOT_CLIENT_SECRET || "",
+		code,
+		grant_type: "authorization_code",
+		redirect_uri: `${process.env.NEXT_PUBLIC_DASHBOARD_URL}/api/auth/callback`,
+		scope: "identify email guilds",
+	});
 
 	if (!process.env.NEXT_PUBLIC_BOT_ID || !process.env.BOT_CLIENT_SECRET) {
 		return NextResponse.redirect(
@@ -27,31 +27,31 @@ export async function GET(request: Request) {
 	try {
 		const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
 			method: "POST",
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			headers: {
+				"Content-Type": "application/x-www-form-urlencoded",
+			},
 			body: params.toString(),
-		})
-			.then((res) => res.json())
-			.catch((err) => {
-				console.error(err);
-				return NextResponse.redirect(
-					new URL("/?error=token_exchange_failed", request.url),
-				);
-			});
+		});
 
-		const data = await tokenResponse;
+		if (!tokenResponse.ok) {
+			const errorText = await tokenResponse.text();
+			console.error("Token exchange failed:", errorText);
+			throw new Error('Token exchange failed');
+		}
+
+		const data = await tokenResponse.json();
 
 		// Get user data from Discord
 		const userResponse = await fetch("https://discord.com/api/users/@me", {
 			headers: {
-				Authorization: `${data.token_type} ${data.access_token}`,
+				Authorization: `Bearer ${data.access_token}`,
 			},
 		});
 
 		if (!userResponse.ok) {
-			console.error("Failed to fetch user data");
-			return NextResponse.redirect(
-				new URL("/?error=fetch_user_failed", request.url),
-			);
+			const errorText = await userResponse.text();
+			console.error("User data fetch failed:", errorText);
+			throw new Error('Failed to fetch user data');
 		}
 
 		const userData = await userResponse.json();
@@ -66,22 +66,18 @@ export async function GET(request: Request) {
 				email: userData.email,
 				verified: userData.verified,
 			},
-			token: {
-				access_token: data.access_token,
-				refresh_token: data.refresh_token,
-				expires_in: data.expires_in,
-				expires_at: Date.now() + data.expires_in * 1000,
-				token_type: data.token_type,
-				scope: data.scope,
-			},
 		};
 
-		// Prepare redirect URL
-		const redirectUrl = new URL("/", request.url);
-		const response = NextResponse.redirect(redirectUrl);
+		// Create response with redirect
+		const response = NextResponse.redirect(
+			new URL("/", process.env.NEXT_PUBLIC_DASHBOARD_URL || request.url)
+		);
 
-		// Set HTTP-only cookie for tokens
-		response.cookies.set("access_token", data.access_token, {
+		// Set cookies using the cookies() API
+		const cookiesStore = cookies();
+
+		// Set access token cookie
+		cookiesStore.set("access_token", data.access_token, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === "production",
 			sameSite: "lax",
@@ -89,27 +85,27 @@ export async function GET(request: Request) {
 			path: "/",
 		});
 
-		response.cookies.set("refresh_token", data.refresh_token, {
+		// Set refresh token cookie
+		cookiesStore.set("refresh_token", data.refresh_token, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === "production",
 			sameSite: "lax",
 			path: "/",
 		});
 
-		// Ustaw cookie dla danych użytkownika, dzięki któremu provider będzie mógł odczytać sesję
-		response.cookies.set("user", JSON.stringify(sessionData.user), {
-			httpOnly: false, // dostępne dla klienta
+		// Set user data cookie
+		cookiesStore.set("user", JSON.stringify(sessionData.user), {
+			httpOnly: false,
 			secure: process.env.NODE_ENV === "production",
 			sameSite: "lax",
 			path: "/",
 		});
 
-		console.log("Session cookies set successfully");
 		return response;
 	} catch (error) {
-		console.error(error);
+		console.error('Auth error:', error);
 		return NextResponse.redirect(
-			new URL("/?error=token_exchange_failed", request.url),
+			new URL("/?error=auth_failed", process.env.NEXT_PUBLIC_DASHBOARD_URL || request.url)
 		);
 	}
 }

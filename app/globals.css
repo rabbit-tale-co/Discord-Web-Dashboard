@@ -38,6 +38,8 @@
   --chart-3: hsl(197 37% 24%);
   --chart-4: hsl(43 74% 66%);
   --chart-5: hsl(27 87% 67%);
+  --chart-success: var(--color-discord-green-500);
+  --chart-error: var(--color-discord-red-500);
   --radius: 0.6rem;
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
@@ -59,6 +61,30 @@
   --color-discord-blue-800: #2f2fa4;
   --color-discord-blue-900: #2d2f82;
   --color-discord-blue-950: #1a1a4c;
+
+  --color-discord-green-50: #e6ffed;
+  --color-discord-green-100: #b7ebc5;
+  --color-discord-green-200: #85d593;
+  --color-discord-green-300: #52c461;
+  --color-discord-green-400: #2e9e4e;
+  --color-discord-green-500: #1e7d3e;
+  --color-discord-green-600: #166534;
+  --color-discord-green-700: #104e25;
+  --color-discord-green-800: #0c361a;
+  --color-discord-green-900: #061b0a;
+  --color-discord-green-950: #030c02;
+
+  --color-discord-red-50: #ffecec;
+  --color-discord-red-100: #ffd7d7;
+  --color-discord-red-200: #ffb3b3;
+  --color-discord-red-300: #ff8d8d;
+  --color-discord-red-400: #ff6666;
+  --color-discord-red-500: #ff4040;
+  --color-discord-red-600: #e51e1e;
+  --color-discord-red-700: #c01414;
+  --color-discord-red-800: #960f0f;
+  --color-discord-red-900: #6b0a0a;
+  --color-discord-red-950: #3d0606;
 
 }
 
@@ -87,6 +113,8 @@
   --chart-3: hsl(30 80% 55%);
   --chart-4: hsl(280 65% 60%);
   --chart-5: hsl(340 75% 55%);
+  --chart-success: var(--color-discord-green-500);
+  --chart-error: var(--color-discord-red-500);
   --sidebar: hsl(240 5.9% 10%);
   --sidebar-foreground: hsl(240 4.8% 95.9%);
   --sidebar-primary: hsl(224.3 76.3% 48%);
