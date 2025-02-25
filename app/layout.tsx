@@ -9,6 +9,7 @@ import { SidebarProvider } from "@/components/navigation/sidebar";
 import { SidebarMobile } from "@/components/sidebar";
 import { Analytics } from "@vercel/analytics/react";
 import type { Robots } from "next/dist/lib/metadata/types/metadata-types";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -114,6 +115,7 @@ export default function RootLayout({
 				</Suspense>
 				<Toaster position="top-center" richColors />
 				<Analytics />
+				<SpeedInsights />
 			</body>
 		</html>
 	);

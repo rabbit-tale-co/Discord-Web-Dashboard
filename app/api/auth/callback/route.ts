@@ -69,6 +69,7 @@ export async function GET(request: Request) {
 		};
 
 		// Create response with redirect
+		// TODO: auth is opened in new window, and is redirect here, close this window and refresh window set data to refresh page
 		const response = NextResponse.redirect(
 			new URL("/", process.env.NEXT_PUBLIC_DASHBOARD_URL || request.url),
 		);
