@@ -12,7 +12,7 @@ import {
 import { User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as Icon from "@/components/icons";
-import type { NavItem } from "@/types/navigation";
+import type { NavItem, NavSection } from "@/types/navigation";
 import type { UserSession } from "@/app/authContext";
 import { useAuth } from "@/app/authContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
@@ -29,7 +29,7 @@ import { navigationConfig } from "./config";
 // Add this type helper
 type IconName = keyof typeof Icon;
 
-export function MobileNav({ user }: { user?: UserSession }) {
+export function MobileNav({ user }: { user?: UserSession | null }) {
 	const [open, setOpen] = React.useState(false);
 	const [openItems, setOpenItems] = React.useState<string[]>([]);
 	const { logout } = useAuth();
@@ -73,45 +73,29 @@ export function MobileNav({ user }: { user?: UserSession }) {
 
 				<div className="flex-1 overflow-auto">
 					<div className="space-y-1 p-2">
-						{navigationConfig.map((item: NavItem) => (
-							<div key={item.title}>
-								<Button
-									variant="ghost"
-									className="w-full justify-start gap-2"
-									onClick={() => item.items && toggleItem(item.title)}
-								>
-									{(() => {
-										const IconComponent = Icon[item.iconName as IconName];
-										return IconComponent ? (
-											<IconComponent className="h-5 w-5" />
-										) : null;
-									})()}
-									{item.title}
-									{item.items && (
-										<Icon.OutlineArrowRight
-											className={cn(
-												"ml-auto size-4 transition-transform",
-												openItems.includes(item.title) && "rotate-90",
-											)}
-										/>
-									)}
-								</Button>
-								{item.items && openItems.includes(item.title) && (
-									<div className="ml-4 space-y-1">
-										{item.items.map((subItem) => (
-											<Button
-												key={subItem.title}
-												variant="ghost"
-												className="w-full justify-start pl-6"
-												asChild
-											>
-												<Link href={subItem.url || ""}>
-													<span>{subItem.title}</span>
-												</Link>
-											</Button>
+						{navigationConfig.map((section) => (
+							<div key={section.title}>
+								<div className="px-3 py-2">
+									<h2 className="mb-2 text-lg font-semibold tracking-tight">
+										{section.title}
+									</h2>
+									<div className="space-y-1">
+										{section.categories?.map((category) => (
+											category.items.map((item) => (
+												<Button
+													key={item.title}
+													variant="ghost"
+													className="w-full justify-start"
+													asChild
+												>
+													<Link href={item.url || ""}>
+														{item.title}
+													</Link>
+												</Button>
+											))
 										))}
 									</div>
-								)}
+								</div>
 							</div>
 						))}
 					</div>

@@ -178,7 +178,7 @@ const FeaturesSection = ({
 					.map((item, index) => (
 						<FeatureCard
 							key={item.title}
-							feature={item}
+							item={item}
 							isFocused={isInExpandedMenu && focusedMenuIndex === index}
 							data-menu-item={index}
 						/>
@@ -191,7 +191,7 @@ const FeaturesSection = ({
 					.map((item, index) => (
 						<FeatureCard
 							key={item.title}
-							feature={item}
+							item={item}
 							isFocused={false}
 							data-menu-item={index + items.length}
 						/>
@@ -225,7 +225,7 @@ const SolutionsSection = ({
 					.map((item, index) => (
 						<FeatureCard
 							key={item.title}
-							feature={item}
+							item={item}
 							isFocused={false}
 							data-menu-item={index}
 						/>
@@ -257,7 +257,7 @@ const DevelopersSection = ({
 					.map((item, index) => (
 						<FeatureCard
 							key={item.title}
-							feature={item}
+							item={item}
 							isFocused={isInExpandedMenu && focusedMenuIndex === index}
 							data-menu-item={index}
 						/>
@@ -270,7 +270,7 @@ const DevelopersSection = ({
 					.map((item, index) => (
 						<FeatureCard
 							key={item.title}
-							feature={item}
+							item={item}
 							isFocused={false}
 							data-menu-item={
 								index + items.filter((f) => f.type === "small").length
@@ -306,7 +306,7 @@ const CompanySection = ({
 						.map((item, index) => (
 							<FeatureCard
 								key={item.title}
-								feature={item}
+								item={item}
 								isFocused={false}
 								data-menu-item={index}
 							/>
@@ -320,7 +320,7 @@ const CompanySection = ({
 							.map((item, index) => (
 								<FeatureCard
 									key={item.title}
-									feature={{
+									item={{
 										...item,
 										minHeight: "100%",
 									}}
@@ -334,7 +334,7 @@ const CompanySection = ({
 						.map((item, index) => (
 							<FeatureCard
 								key={item.title}
-								feature={item}
+								item={item}
 								isFocused={isInExpandedMenu && focusedMenuIndex === index}
 								data-menu-item={index + 2}
 							/>

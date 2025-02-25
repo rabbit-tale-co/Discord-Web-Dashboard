@@ -55,10 +55,10 @@ export const useNav = () => {
 					setIsInExpandedMenu(true);
 					setFocusedMenuIndex(0);
 					scrollToMenuItem(0);
-				} else if (isInExpandedMenu && activeNav?.features) {
+				} else if (isInExpandedMenu && activeNav?.categories) {
 					const newIndex = Math.min(
 						focusedMenuIndex + 1,
-						activeNav.features.length - 1,
+						activeNav.categories.length - 1,
 					);
 					setFocusedMenuIndex(newIndex);
 					scrollToMenuItem(newIndex);
@@ -90,7 +90,7 @@ export const useNav = () => {
 
 			if (e.key === "Tab" && isInExpandedMenu) {
 				e.preventDefault();
-				const itemsCount = activeNav?.features?.length || 0;
+				const itemsCount = activeNav?.categories?.length || 0;
 				if (itemsCount === 0) return;
 
 				if (e.shiftKey) {

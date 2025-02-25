@@ -35,14 +35,21 @@ export async function GET(request: Request) {
 			return NextResponse.json(null);
 		}
 
-		const guildData = (await response.json()) as Guild;
+		const guildData = await response.json();
+		const timestamp =
+			Number(BigInt(guildData.guild_details.id) >> BigInt(22)) + 1420070400000;
+		const created_at = new Date(timestamp).toISOString();
 
-		// console.log(guildData);
+		// console.log(created_at);
+		// Add the creation date to the guild data
+		const enrichedGuildData = {
+			...guildData,
+			created_at,
+		};
 
-		return NextResponse.json(guildData);
+		return NextResponse.json(enrichedGuildData);
 	} catch (error) {
 		console.error("Error in guild details route:", error);
-		// Return a default structure even in case of error
 		return NextResponse.json(null);
 	}
 }

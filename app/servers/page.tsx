@@ -11,6 +11,7 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Skeleton } from "@/components/ui/skeleton";
 import avatarUrl from "@/lib/is-gif";
+import { useGuilds } from "@/hooks/use-guilds";
 
 interface Server {
 	id: string;
@@ -24,32 +25,7 @@ interface Server {
 
 export default function Servers() {
 	const { user } = useAuth();
-	const [servers, setServers] = useState<Server[]>([]);
-	const [status, setStatus] = useState<"loading" | "error" | "success">(
-		"loading",
-	);
-
-	useEffect(() => {
-		if (user) {
-			fetch("/api/guilds")
-				.then((res) => res.json())
-				.then((data) => {
-					const serverArray = Array.isArray(data) ? data : data.guilds || [];
-					setServers(serverArray);
-					console.log("Servers data:", serverArray);
-					setStatus("success");
-				})
-				.catch((err) => {
-					console.error("Error fetching guilds:", err);
-					setServers([]);
-					setStatus("error");
-				});
-		}
-	}, [user]);
-
-	if (!user) {
-		return null;
-	}
+	const { guilds, status } = useGuilds();
 
 	const getServerAvatar = (server: Server) => {
 		if (!server.icon) return "/default-server-avatar.png";
@@ -102,10 +78,10 @@ export default function Servers() {
 											</div>
 										</div>
 									))
-								: servers.map((server) => (
+								: guilds?.map((guild) => (
 										// 🔹 Server Card with Nested Grid
 										<div
-											key={server.id}
+											key={guild.id}
 											className="group relative overflow-hidden rounded-3xl bg-primary transition-all duration-300 p-1"
 										>
 											{/* Inner Grid Layout */}
@@ -114,18 +90,18 @@ export default function Servers() {
 												<div className="relative w-full aspect-video overflow-hidden rounded-[20px]">
 													<Image
 														src={avatarUrl(
-															server.id,
-															server.icon || "",
+															guild.id,
+															guild.icon || "",
 															1024,
 															false,
 														)}
-														alt={server.name}
+														alt={guild.name}
 														width={900}
 														height={600}
 														className="h-full w-full object-cover object-center transition-transform duration-300 sm:group-hover:scale-105"
 													/>
 													<div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-transparent" />
-													{server.premium_tier > 0 && (
+													{guild.premium_tier > 0 && (
 														<Button
 															variant={"outline"}
 															size={"icon"}
@@ -141,11 +117,11 @@ export default function Servers() {
 												<div className="flex gap-2 justify-between items-end pr-2 pb-2">
 													<div className="flex flex-col items-start max-w-[50%] pl-3">
 														<h3 className="text-lg truncate font-semibold text-white w-full">
-															{server.name}
+															{guild.name}
 														</h3>
 														<p className="text-sm text-white/75 font-medium">
 															{(
-																server.approximate_member_count || 0
+																guild.approximate_member_count || 0
 															).toLocaleString()}{" "}
 															members
 														</p>
@@ -153,20 +129,20 @@ export default function Servers() {
 
 													{/* 🔹 Button Section */}
 													<Button
-														variant={!server.has_bot ? "discord" : "secondary"}
+														variant={!guild.has_bot ? "discord" : "secondary"}
 														size={"lg"}
 														asChild
 													>
 														<Link
 															href={
-																!server.has_bot
-																	? `https://discord.com/api/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&permissions=8&scope=bot%20applications.commands&guild_id=${server.id}`
-																	: `/dashboard/${server.id}`
+																!guild.has_bot
+																	? `https://discord.com/api/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&permissions=8&scope=bot%20applications.commands&guild_id=${guild.id}`
+																	: `/dashboard/${guild.id}`
 															}
-															target={!server.has_bot ? "_blank" : undefined}
+															target={!guild.has_bot ? "_blank" : undefined}
 														>
-															{!server.has_bot ? "Add to Server" : "Configure"}
-															{!server.has_bot ? (
+															{!guild.has_bot ? "Add to Server" : "Configure"}
+															{!guild.has_bot ? (
 																<Icon.SolidDiscord />
 															) : (
 																<Icon.SolidArrowRight />

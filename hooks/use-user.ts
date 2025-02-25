@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 
-interface UserData {
+export interface UserData {
 	id: string;
 	username: string;
+	displayName?: string;
 	avatar: string;
-	discriminator: string;
+	email: string;
 }
 
 export function useGetUser(userId: string) {

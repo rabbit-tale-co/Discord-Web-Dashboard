@@ -15,7 +15,7 @@ export const navigationConfig: NavSection[] = [
 						title: "Server Analytics",
 						description:
 							"Track member growth, engagement metrics, and activity trends in real-time",
-						url: "/features/analytics",
+						url: "analytics",
 						iconName: "SolidLogo",
 					},
 					{
@@ -23,7 +23,7 @@ export const navigationConfig: NavSection[] = [
 						title: "Level System",
 						description:
 							"Reward active members with XP, ranks, and customizable role rewards",
-						url: "/features/levels",
+						url: "levels",
 						iconName: "SolidLogo",
 					},
 				],
@@ -36,14 +36,14 @@ export const navigationConfig: NavSection[] = [
 						type: "small",
 						title: "Moderation Suite",
 						description: "Tools for moderation",
-						url: "/features/moderation",
+						url: "moderation",
 						iconName: "SolidLogo",
 					},
 					{
 						type: "small",
 						title: "Auto Roles",
 						description: "Role assignment and management",
-						url: "/features/roles",
+						url: "roles",
 						iconName: "SolidLogo",
 					},
 				],
@@ -56,14 +56,14 @@ export const navigationConfig: NavSection[] = [
 						type: "small",
 						title: "Birthday System",
 						description: "Birthday celebrations and announcements",
-						url: "/features/birthdays",
+						url: "birthdays",
 						iconName: "SolidLogo",
 					},
 					{
 						type: "small",
 						title: "Ticket System",
 						description: "Ticket management with transcripts",
-						url: "/features/tickets",
+						url: "tickets",
 						iconName: "SolidLogo",
 					},
 					{
@@ -71,7 +71,7 @@ export const navigationConfig: NavSection[] = [
 						title: "Temporary Channels",
 						description:
 							"Dynamic voice channels that auto-delete when inactive",
-						url: "/features/tempvc",
+						url: "tempvc",
 						iconName: "SolidLogo",
 					},
 				],

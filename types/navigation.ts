@@ -6,6 +6,8 @@ export interface BaseFeature {
 	description: string;
 	url?: string;
 	icon?: React.ElementType;
+	minWidth?: number;
+	minHeight?: string;
 	items?: {
 		title: string;
 		description: string;
@@ -48,6 +50,7 @@ export interface NavSection {
 	title: string;
 	iconName: string;
 	categories: NavCategory[];
+	features?: NavItem[];
 	url?: string;
 }
 
@@ -86,17 +89,20 @@ export interface NavMainItem {
 
 export interface NavItem {
 	title: string;
-	url?: string | undefined;
-	iconName?: string | undefined;
-	description?: string | undefined;
-	items?: NavItem[] | undefined;
-	minWidth?: number | undefined;
-	minHeight?: string | undefined;
-	type?: "small" | "large" | undefined;
+	description: string;
+	url?: string;
+	icon?: React.ElementType;
+	iconName?: string;
+	items?: NavItem[];
+	minWidth?: number;
+	minHeight?: string;
+	type: "small" | "large";
+	image?: string;
 }
 
 export interface NavCategory {
 	title: string;
 	iconName?: string;
+	url?: string;
 	items: NavItem[];
 }

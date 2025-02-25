@@ -6,6 +6,7 @@ import {
 	ChevronsUpDown,
 	CreditCard,
 	LogOut,
+	Server,
 	Sparkles,
 } from "lucide-react";
 
@@ -25,17 +26,21 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@/components/navigation/sidebar";
+import Link from "next/link";
+import type { UserData } from "@/hooks/use-user";
+import { useAuth } from "@/app/authContext";
 
-export function NavUser({
-	user,
-}: {
-	user: {
-		name: string;
-		email: string;
-		avatar: string;
-	};
-}) {
+interface NavUserProps {
+	user?: UserData | null;
+}
+
+export function NavUser({ user }: NavUserProps) {
 	const { isMobile } = useSidebar();
+	const { logout } = useAuth();
+
+	if (!user) return null;
+
+	const avatarUrl = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`;
 
 	return (
 		<SidebarMenu>
@@ -46,13 +51,17 @@ export function NavUser({
 							size="lg"
 							className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
 						>
-							<Avatar className="h-8 w-8 rounded-lg">
-								<AvatarImage src={user.avatar} alt={user.name} />
-								<AvatarFallback className="rounded-lg">CN</AvatarFallback>
+							<Avatar className="size-8 rounded-lg">
+								<AvatarImage src={avatarUrl} alt={user.username} />
+								<AvatarFallback className="rounded-lg">
+									{user.username.substring(0, 2).toUpperCase()}
+								</AvatarFallback>
 							</Avatar>
 							<div className="grid flex-1 text-left text-sm leading-tight">
-								<span className="truncate font-semibold">{user.name}</span>
-								<span className="truncate text-xs">{user.email}</span>
+								<span className="truncate font-semibold">{user.username}</span>
+								<span className="truncate text-xs">
+									{user.email || `#${user.id}`}
+								</span>
 							</div>
 							<ChevronsUpDown className="ml-auto size-4" />
 						</SidebarMenuButton>
@@ -65,42 +74,58 @@ export function NavUser({
 					>
 						<DropdownMenuLabel className="p-0 font-normal">
 							<div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-								<Avatar className="h-8 w-8 rounded-lg">
-									<AvatarImage src={user.avatar} alt={user.name} />
-									<AvatarFallback className="rounded-lg">CN</AvatarFallback>
+								<Avatar className="size-8 rounded-lg">
+									<AvatarImage src={avatarUrl} alt={user.username} />
+									<AvatarFallback className="rounded-lg">
+										{user.username.substring(0, 2).toUpperCase()}
+									</AvatarFallback>
 								</Avatar>
 								<div className="grid flex-1 text-left text-sm leading-tight">
-									<span className="truncate font-semibold">{user.name}</span>
-									<span className="truncate text-xs">{user.email}</span>
+									<span className="truncate font-semibold">
+										{user.username}
+									</span>
+									<span className="truncate text-xs">
+										{user.email || `#${user.id}`}
+									</span>
 								</div>
 							</div>
 						</DropdownMenuLabel>
 						<DropdownMenuSeparator />
 						<DropdownMenuGroup>
-							<DropdownMenuItem>
-								<Sparkles />
-								Upgrade to Pro
+							<DropdownMenuItem asChild>
+								<Link href="/servers">
+									<Server className="mr-2 h-4 w-4" />
+									My Servers
+								</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link href="/premium">
+									<Sparkles className="mr-2 h-4 w-4" />
+									Get Premium
+								</Link>
 							</DropdownMenuItem>
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
 						<DropdownMenuGroup>
 							<DropdownMenuItem>
-								<BadgeCheck />
+								<BadgeCheck className="mr-2 h-4 w-4" />
 								Account
 							</DropdownMenuItem>
 							<DropdownMenuItem>
-								<CreditCard />
+								<CreditCard className="mr-2 h-4 w-4" />
 								Billing
 							</DropdownMenuItem>
 							<DropdownMenuItem>
-								<Bell />
+								<Bell className="mr-2 h-4 w-4" />
 								Notifications
 							</DropdownMenuItem>
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
-						<DropdownMenuItem>
-							<LogOut />
-							Log out
+						<DropdownMenuItem asChild>
+							<Link href={"#"} onClick={() => logout()}>
+								<LogOut className="mr-2 h-4 w-4" />
+								Log out
+							</Link>
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>

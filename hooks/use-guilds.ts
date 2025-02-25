@@ -2,9 +2,22 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/app/authContext";
 import type * as Discord from "discord.js";
 
+interface Server {
+	id: string;
+	name: string;
+	icon: string | null;
+	owner: boolean;
+	permissions: string;
+	features: string[];
+	premium_tier: number;
+	has_bot: boolean;
+	bot_joined?: boolean;
+	approximate_member_count?: number;
+}
+
 export const useGuilds = () => {
 	const { user } = useAuth();
-	const [guilds, setGuilds] = useState([]);
+	const [guilds, setGuilds] = useState<Server[]>([]);
 	const [status, setStatus] = useState<"loading" | "error" | "success">(
 		"loading",
 	);
@@ -14,15 +27,14 @@ export const useGuilds = () => {
 		if (user) {
 			fetch("/api/guilds")
 				.then(async (res) => {
-					if (!res.ok) {
-						const errorData = await res.json();
-						throw new Error(errorData.error || "Failed to fetch guilds");
-					}
+					if (!res.ok) throw new Error("Failed to fetch guilds");
 					return res.json();
 				})
 				.then((data) => {
-					console.log("Received guilds:", data);
-					setGuilds(data.guilds || []);
+					if (!Array.isArray(data)) {
+						throw new Error("Invalid guilds data format");
+					}
+					setGuilds(data);
 					setStatus("success");
 				})
 				.catch((err) => {
@@ -60,6 +72,7 @@ export interface GuildData {
 		position: number;
 	}[];
 	rolesCount: number;
+	created_at: string;
 }
 
 export function useGuild(id: string) {
@@ -89,6 +102,7 @@ export function useGuild(id: string) {
 						roles: data.roles,
 						rolesCount: data.roles.length,
 						region: data.region,
+						created_at: data.created_at,
 					};
 					setGuildData(transformedData);
 					setStatus("success");
