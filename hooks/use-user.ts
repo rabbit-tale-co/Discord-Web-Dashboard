@@ -154,8 +154,21 @@ export function useMe() {
 		}
 	}, [isLoggedIn]);
 
-	const loginFn = () => {
-		login();
+	const loginFn = async () => {
+		return new Promise<void>((resolve) => {
+			const loginWindow = window.open(
+				`https://discord.com/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&redirect_uri=${process.env.NEXT_PUBLIC_DASHBOARD_URL}/api/auth/callback&response_type=code&scope=identify+guilds+email+applications.commands.permissions.update`,
+				"_blank",
+			);
+
+			window.addEventListener("message", (event) => {
+				if (event.data === "login-success") {
+					loginWindow?.close();
+					window.location.reload();
+					resolve();
+				}
+			});
+		});
 	};
 
 	const logoutFn = async () => {
