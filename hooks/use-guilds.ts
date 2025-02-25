@@ -15,29 +15,30 @@ interface Server {
 	approximate_member_count?: number;
 }
 
+interface CachedGuild {
+	data: Server[] | GuildData;
+	expiresAt: number;
+}
+
 export const useGuilds = () => {
 	const { user } = useAuth();
 	const [guilds, setGuilds] = useState<Server[]>(() => {
-		// Initialize state with cached data if available
-		const cached = getCachedData("guilds") as Server[];
-		return cached || [];
+		const cached = getCachedData("guilds") as CachedGuild;
+		return (cached?.data as Server[]) || [];
 	});
 	const [status, setStatus] = useState<"loading" | "error" | "success">(() => {
-		// Set initial status based on cache
 		return getCachedData("guilds") ? "success" : "loading";
 	});
 	const [error, setError] = useState<string | null>(null);
-	const CACHE_TIME = 1000 * 60 * 5; // 5 minutes
+	const CACHE_TIME = "15m";
 
 	useEffect(() => {
 		if (!user) return;
 
-		const cached = getCachedData("guilds");
-		const cacheTimestamp = getCachedData("guilds-timestamp") as number;
+		const cached = getCachedData("guilds") as CachedGuild;
 		const now = Date.now();
 
-		// Only fetch if no cache or cache is expired
-		if (!cached || !cacheTimestamp || now - cacheTimestamp > CACHE_TIME) {
+		if (!cached?.data || cached.expiresAt <= now) {
 			fetch("/api/guilds")
 				.then(async (res) => {
 					if (!res.ok) throw new Error("Failed to fetch guilds");
@@ -49,8 +50,7 @@ export const useGuilds = () => {
 					}
 					setGuilds(data);
 					setStatus("success");
-					setCachedData("guilds", data);
-					setCachedData("guilds-timestamp", now);
+					setCachedData("guilds", data, CACHE_TIME);
 				})
 				.catch((err) => {
 					console.error("Error fetching guilds:", err);
@@ -92,24 +92,21 @@ export interface GuildData {
 
 export function useGuild(id: string) {
 	const [guildData, setGuildData] = useState<GuildData | null>(() => {
-		// Initialize with cached data if available
-		return getCachedData(`guild-${id}`) || null;
+		const cached = getCachedData(`guild-${id}`) as CachedGuild;
+		return (cached?.data as GuildData) || null;
 	});
 	const [status, setStatus] = useState<"loading" | "error" | "success">(() => {
 		return getCachedData(`guild-${id}`) ? "success" : "loading";
 	});
 	const [error, setError] = useState<string | null>(null);
-	const CACHE_TIME = 1000 * 60 * 5; // 5 minutes
 
 	useEffect(() => {
 		if (!id) return;
 
-		const cached = getCachedData(`guild-${id}`);
-		const cacheTimestamp = getCachedData(`guild-${id}-timestamp`) as number;
+		const cached = getCachedData(`guild-${id}`) as CachedGuild;
 		const now = Date.now();
 
-		// Only fetch if no cache or cache is expired
-		if (!cached || !cacheTimestamp || now - cacheTimestamp > CACHE_TIME) {
+		if (!cached?.data || cached.expiresAt <= now) {
 			setStatus("loading");
 			fetch(`/api/guilds/${id}`)
 				.then(async (res) => {
@@ -132,8 +129,7 @@ export function useGuild(id: string) {
 					};
 					setGuildData(transformedData);
 					setStatus("success");
-					setCachedData(`guild-${id}`, transformedData);
-					setCachedData(`guild-${id}-timestamp`, now);
+					setCachedData(`guild-${id}`, transformedData, "15m");
 				})
 				.catch((err) => {
 					console.error("Error fetching guild:", err);

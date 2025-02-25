@@ -1,32 +1,58 @@
-const DEFAULT_EXPIRY = 5 * 60 * 1000; // Default 5 minutes
+type TimeUnit = "s" | "m" | "h" | "d" | "y";
+type CacheTime = number | `${number}${TimeUnit}`;
 
-export function getCachedData<T>(key: string, expiryTime?: number): T | null {
+function parseCacheTime(time: CacheTime): number {
+	if (typeof time === "number") return time;
+
+	const match = time.match(/^(\d+)(s|m|h|d|y)$/);
+	if (!match) throw new Error("Invalid time format");
+
+	const [, value, unit] = match;
+	const numValue = Number.parseInt(value, 10);
+
+	switch (unit as TimeUnit) {
+		case "s":
+			return numValue * 1000;
+		case "m":
+			return numValue * 60 * 1000;
+		case "h":
+			return numValue * 60 * 60 * 1000;
+		case "d":
+			return numValue * 24 * 60 * 60 * 1000;
+		case "y":
+			return numValue * 365 * 24 * 60 * 60 * 1000;
+		default:
+			throw new Error("Invalid time unit");
+	}
+}
+
+export interface CachedData<T = unknown> {
+	data: T;
+	expiresAt: number;
+}
+
+export function getCachedData<T>(key: string): CachedData<T> | null {
 	try {
 		if (typeof window === "undefined") return null;
 		const savedData = localStorage.getItem(key);
 		if (!savedData) return null;
-
-		const { data, timestamp } = JSON.parse(savedData);
-
-		// if expiryTime is Infinity, cache never expires
-		if (expiryTime === Number.POSITIVE_INFINITY) return data;
-
-		// if the expiry time has passed, remove the cache
-		if (Date.now() - timestamp > (expiryTime ?? DEFAULT_EXPIRY)) {
-			localStorage.removeItem(key);
-			return null;
-		}
-		return data;
+		const parsed = JSON.parse(savedData) as CachedData<T>;
+		return parsed;
 	} catch (e) {
 		console.warn(`Failed to get cache for ${key}:`, e);
 		return null;
 	}
 }
 
-export function setCachedData<T>(key: string, data: T) {
+export function setCachedData<T>(
+	key: string,
+	data: T,
+	expiryTime: CacheTime = "5m",
+) {
 	try {
 		if (typeof window === "undefined") return;
-		localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+		const expiresAt = Date.now() + parseCacheTime(expiryTime);
+		localStorage.setItem(key, JSON.stringify({ data, expiresAt }));
 	} catch (e) {
 		console.warn(`Failed to set cache for ${key}:`, e);
 	}
