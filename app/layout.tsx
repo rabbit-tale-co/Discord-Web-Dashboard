@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarProvider } from "@/components/navigation/sidebar";
 import { SidebarMobile } from "@/components/dashbaord/sidebar";
+import { Analytics } from "@vercel/analytics/react";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -93,6 +94,7 @@ export default function RootLayout({
 					</AuthProvider>
 				</Suspense>
 				<Toaster position="top-center" richColors />
+				<Analytics />
 			</body>
 		</html>
 	);
