@@ -31,3 +31,12 @@ export function setCachedData<T>(key: string, data: T) {
 		console.warn(`Failed to set cache for ${key}:`, e);
 	}
 }
+
+export function clearCache(key: string) {
+	try {
+		if (typeof window === "undefined") return; // Ochrona przed SSR
+		localStorage.removeItem(key);
+	} catch (e) {
+		console.warn(`Failed to clear cache for ${key}:`, e);
+	}
+}

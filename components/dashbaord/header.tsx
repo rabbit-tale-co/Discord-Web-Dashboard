@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import * as Icon from "@/components/icons";
 import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar";
 import avatarUrl from "@/lib/is-gif";
-import { SidebarTrigger } from "../navigation/sidebar";
 
 export function DashboardHeader() {
 	const { id } = useParams();

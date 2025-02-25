@@ -5,8 +5,8 @@ import { DashboardHeader } from "@/components/dashbaord/header";
 import { Footer } from "@/components/footer";
 
 export const metadata: Metadata = {
-	title: "Discord Bot Dashboard",
-	description: "Discord Bot Dashboard",
+	title: `Discord Bot | ${process.env.NEXT_PUBLIC_BOT_NAME}`,
+	description: "The best Discord bot for your server",
 };
 
 export default function DashboardLayout({

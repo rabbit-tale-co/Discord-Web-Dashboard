@@ -13,27 +13,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import avatarUrl from "@/lib/is-gif";
 import { useGuilds } from "@/hooks/use-guilds";
 
-interface Server {
-	id: string;
-	name: string;
-	icon: string | null;
-	features: string[];
-	approximate_member_count?: number;
-	premium_tier: number;
-	has_bot: boolean;
-}
-
 export default function Servers() {
-	const { user } = useAuth();
 	const { guilds, status } = useGuilds();
-
-	const getServerAvatar = (server: Server) => {
-		if (!server.icon) return "/default-server-avatar.png";
-
-		const isGif = server.icon.startsWith("a_");
-		const extension = isGif ? "gif" : "webp";
-		return `https://cdn.discordapp.com/icons/${server.id}/${server.icon}.${extension}?size=512`;
-	};
 
 	return (
 		<React.Fragment>

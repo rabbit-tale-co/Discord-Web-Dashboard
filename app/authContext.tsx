@@ -1,88 +1,47 @@
 "use client";
 
-import {
-	createContext,
-	useContext,
-	useEffect,
-	useState,
-	type Dispatch,
-	type SetStateAction,
-} from "react";
-import { useRouter, usePathname } from "next/navigation";
+import type * as Discord from "discord.js";
+import { useMe } from "@/hooks/use-user";
+import { createContext, useContext, useEffect, useState } from "react";
 
-export interface UserSession {
-	id: string;
-	username: string;
-	global_name: string;
-	avatar: string;
+interface User extends Discord.User {
 	email: string;
-	verified: boolean;
 }
 
 interface AuthContextType {
-	user: UserSession | null;
-	setUser: Dispatch<SetStateAction<UserSession | null>>;
-	logout: () => void;
-	isProtectedPath: boolean;
-	isLoading: boolean;
+	user: User | null;
+	error: string | null;
+	login: () => Promise<void>;
+	logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
 	user: null,
-	setUser: () => {},
-	logout: () => {},
-	isProtectedPath: false,
-	isLoading: true,
+	error: null,
+	login: () => Promise.resolve(),
+	logout: () => Promise.resolve(),
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-	const [user, setUser] = useState<UserSession | null>(null);
-	const [isLoading, setIsLoading] = useState(true);
-
-	const protectedPaths = ["/dashboard", "/servers"];
-	const router = useRouter();
-	const pathname = usePathname();
-	const isProtectedPath = protectedPaths.some((path) =>
-		pathname.startsWith(path),
-	);
+	const [mounted, setMounted] = useState(false);
+	const { userData, error, logout, login } = useMe();
 
 	useEffect(() => {
-		const storedUser = localStorage.getItem("user");
-		if (storedUser) {
-			setUser(JSON.parse(storedUser));
-			setIsLoading(false);
-		} else {
-			fetch("/api/session")
-				.then((res) => res.json())
-				.then((data) => {
-					if (data.user) {
-						setUser(data.user);
-						localStorage.setItem("user", JSON.stringify(data.user));
-					}
-					setIsLoading(false);
-				})
-				.catch((err) => {
-					console.error("Error fetching session:", err);
-					setIsLoading(false);
-				});
-		}
+		setMounted(true);
 	}, []);
 
-	useEffect(() => {
-		if (!isLoading && !user && isProtectedPath) {
-			router.push("/");
-		}
-	}, [user, isProtectedPath, router, isLoading]);
-
-	const logout = async () => {
-		await fetch("/api/auth/logout");
-		setUser(null);
-		localStorage.removeItem("user");
-	};
+	if (!mounted) {
+		return null;
+	}
 
 	return (
 		<AuthContext.Provider
-			value={{ user, setUser, logout, isProtectedPath, isLoading }}
+			value={{
+				user: userData as User,
+				logout,
+				login,
+				error,
+			}}
 		>
 			{children}
 		</AuthContext.Provider>

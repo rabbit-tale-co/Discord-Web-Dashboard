@@ -19,7 +19,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/app/authContext";
 import { Button } from "@/components/ui/button";
 import * as Icon from "@/components/icons";
-import Link from "next/link";
+import { login } from "@/hooks/use-user";
 
 const plugins: NavSection = {
 	title: "Plugins",
@@ -52,37 +52,6 @@ export function DashboardSidebar({
 			</SidebarContent>
 			<SidebarFooter>{user && <NavUser user={user} />}</SidebarFooter>
 			<SidebarRail />
-		</Sidebar>
-	);
-}
-
-export function SidebarMobile({
-	...props
-}: React.ComponentProps<typeof Sidebar>) {
-	const { user } = useAuth();
-
-	return (
-		<Sidebar {...props} target="mobile">
-			{/* <SidebarHeader>
-				<ServerSwitcher servers={guilds || []} />
-			</SidebarHeader> */}
-			<SidebarContent>
-				<NavMainMobile />
-			</SidebarContent>
-			<SidebarFooter>
-				{user ? (
-					<NavUser user={user} />
-				) : (
-					<Button variant="discord" size="lg" className="w-full" asChild>
-						<Link
-							href={`https://discord.com/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&redirect_uri=${process.env.NEXT_PUBLIC_DASHBOARD_URL}/api/auth/callback&response_type=code&scope=identify%20email`}
-						>
-							Login with Discord
-							<Icon.SolidDiscord size={22} />
-						</Link>
-					</Button>
-				)}
-			</SidebarFooter>
 		</Sidebar>
 	);
 }

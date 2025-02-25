@@ -6,8 +6,9 @@ import { AuthProvider } from "@/app/authContext";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarProvider } from "@/components/navigation/sidebar";
-import { SidebarMobile } from "@/components/dashbaord/sidebar";
+import { SidebarMobile } from "@/components/sidebar";
 import { Analytics } from "@vercel/analytics/react";
+import type { Robots } from "next/dist/lib/metadata/types/metadata-types";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -20,8 +21,26 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "Discord Bot Dashboard",
-	description: "Discord Bot Dashboard",
+	title: `The Best Discord Bot | ${process.env.NEXT_PUBLIC_BOT_NAME}`,
+	keywords: [
+		"discord",
+		"bot",
+		"discord bot",
+		"discord bot dashboard",
+		"rabbit",
+		"tiny",
+		"dashboard",
+	],
+	description: `${process.env.NEXT_PUBLIC_BOT_DESCRIPTION} is a all in one bot that can help you manage your server.`,
+};
+
+export const robots: Robots = {
+	index: true,
+	follow: true,
+	googleBot: {
+		index: true,
+		follow: true,
+	},
 };
 
 export default function RootLayout({
@@ -88,7 +107,7 @@ export default function RootLayout({
 				>
 					<AuthProvider>
 						<SidebarProvider defaultOpen={false}>
-							<SidebarMobile className="z-100" />
+							<SidebarMobile />
 							<div className="relative flex flex-col w-full">{children}</div>
 						</SidebarProvider>
 					</AuthProvider>

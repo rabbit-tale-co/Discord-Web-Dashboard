@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users, MessageSquare, Hash, Crown } from "lucide-react";
 import avatarUrl from "@/lib/is-gif";
 import type { GuildData } from "@/hooks/use-guilds";
-import { useGetUser } from "@/hooks/use-user";
+import { useUser } from "@/hooks/use-user";
 
 interface GuildOverviewProps {
 	guildData: GuildData & {
@@ -34,7 +34,7 @@ export function ServerOverview({ guildData }: GuildOverviewProps) {
 	const totalChannels =
 		category_count + text_channel_count + voice_channel_count;
 
-	const { userData: ownerData, status: ownerStatus } = useGetUser(
+	const { userData: ownerData, status: ownerStatus } = useUser(
 		guild_details.owner_id,
 	);
 

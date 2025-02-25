@@ -5,24 +5,21 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import * as Icon from "@/components/icons";
 import { useAuth } from "@/app/authContext";
-import { UserAvatar } from "@/components/user-avatar";
-import { MobileNav } from "@/components/navigation/mobile-nav";
+import { UserInfo } from "@/components/user-info";
 import type { NavSection } from "@/types/navigation";
 import { ExpandedMenu } from "./navigation/expanded-menu";
 import { navigationConfig } from "./navigation/config";
 import { useNav } from "@/hooks/use-nav";
-import { SidebarTrigger, useSidebar } from "./navigation/sidebar";
+import { useSidebar } from "./navigation/sidebar";
+import { DropDownUser } from "./drop-down-user";
 
 export const Header = () => {
 	const {
 		activeNav,
 		isInExpandedMenu,
 		isKeyboardNavigation,
-		isMouseInteraction,
 		isMounted,
 		setActiveNav,
-		setFocusedNavIndex,
-		setFocusedMenuIndex,
 		setIsInExpandedMenu,
 		setIsKeyboardNavigation,
 		setIsMouseInteraction,
@@ -32,7 +29,7 @@ export const Header = () => {
 
 	const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const botName = process.env.NEXT_PUBLIC_BOT_NAME || "";
-	const { user } = useAuth();
+	const { user, login } = useAuth();
 
 	const handleNavEnter = (item: NavSection) => {
 		setIsKeyboardNavigation(false);
@@ -63,44 +60,6 @@ export const Header = () => {
 					setIsInExpandedMenu(false);
 				}
 			}, 50);
-		}
-	};
-
-	const handleNavFocus = (item: NavSection, index: number) => {
-		if (isMouseInteraction) return;
-		setIsKeyboardNavigation(true);
-		setIsMouseInteraction(false);
-		setFocusedNavIndex(index);
-		setActiveNav(item);
-		setIsInExpandedMenu(false);
-		setFocusedMenuIndex(-1);
-		setTimeout(() => {
-			const navButton = document.querySelector(
-				`[data-nav-button="${index}"]`,
-			) as HTMLElement;
-			navButton?.focus();
-		}, 0);
-	};
-
-	const handleNavBlur = (e: React.FocusEvent) => {
-		const relatedTarget = e.relatedTarget as HTMLElement;
-		const isMovingToAnotherNav = relatedTarget?.closest("[data-nav-button]");
-
-		if (isMovingToAnotherNav) {
-			const newIndex = Number.parseInt(
-				relatedTarget.getAttribute("data-nav-button") || "-1",
-			);
-			if (newIndex >= 0) {
-				setActiveNav(navigationConfig[newIndex]);
-				setFocusedNavIndex(newIndex);
-				setIsInExpandedMenu(false);
-			}
-			return;
-		}
-
-		if (!relatedTarget?.closest("[data-menu-container]")) {
-			setActiveNav(null);
-			setIsInExpandedMenu(false);
 		}
 	};
 
@@ -223,7 +182,12 @@ export const Header = () => {
 							</Link>
 						</Button>
 						{user ? (
-							<UserAvatar user={user} />
+							<DropDownUser
+								username={user.username}
+								email={user.email}
+								avatar={user.avatar || ""}
+								id={user.id}
+							/>
 						) : (
 							<Button
 								asChild
@@ -231,12 +195,15 @@ export const Header = () => {
 								size="lg"
 								className="max-md:hidden"
 							>
-								<Link
-									href={`https://discord.com/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&redirect_uri=${process.env.NEXT_PUBLIC_DASHBOARD_URL}/api/auth/callback&response_type=code&scope=identify%20email`}
+								<Button
+									variant="discord"
+									size="lg"
+									className="max-md:hidden"
+									onClick={() => login()}
 								>
 									Login
 									<Icon.SolidDiscord size={22} />
-								</Link>
+								</Button>
 							</Button>
 						)}
 

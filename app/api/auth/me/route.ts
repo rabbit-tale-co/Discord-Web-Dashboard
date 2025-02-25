@@ -6,6 +6,7 @@ export async function GET() {
 		const cookieStore = await cookies();
 		const accessToken = cookieStore.get("access_token")?.value;
 		const refreshToken = cookieStore.get("refresh_token")?.value;
+		const user = cookieStore.get("user")?.value;
 
 		if (!accessToken || !refreshToken) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,24 +42,7 @@ export async function GET() {
 
 		const userData = await userResponse.json();
 
-		return NextResponse.json({
-			user: {
-				id: userData.id,
-				username: userData.username,
-				global_name: userData.global_name,
-				avatar: userData.avatar,
-				email: userData.email,
-				verified: userData.verified,
-			},
-			token: {
-				access_token: accessToken,
-				refresh_token: refreshToken,
-				expires_in: 604_800, // 7 days in seconds
-				scope: "identify email",
-				token_type: "Bearer",
-				expires_at: Date.now() + 604_800_000, // epoch timestamp
-			},
-		});
+		return NextResponse.json(userData);
 	} catch (error) {
 		console.error("Auth API Error:", error);
 		return NextResponse.json(
