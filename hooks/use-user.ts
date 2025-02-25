@@ -8,10 +8,18 @@ import { clearCache, getCachedData, setCachedData } from "@/lib/cache";
 const CACHE_TIME = "1d";
 
 export function login() {
-	window.open(
+	const loginWindow = window.open(
 		`https://discord.com/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&redirect_uri=${process.env.NEXT_PUBLIC_DASHBOARD_URL}/api/auth/callback&response_type=code&scope=identify+guilds+email+applications.commands.permissions.update`,
 		"_blank",
 	);
+
+	// Listen for message from new window
+	window.addEventListener("message", (event) => {
+		if (event.data === "login-success") {
+			loginWindow?.close();
+			window.location.reload();
+		}
+	});
 }
 
 export async function logout() {
@@ -146,14 +154,24 @@ export function useMe() {
 		}
 	}, [isLoggedIn]);
 
-	const loginFn = async () => {
-		return login();
+	const loginFn = () => {
+		login();
 	};
 
 	const logoutFn = async () => {
-		await logout();
+		const res = await fetch("/api/auth/logout");
+		const data = await res.json();
+
+		clearCache("user");
 		setUserData(null);
 		setStatus("success");
+
+		if (data.redirectUrl) {
+			router.push(data.redirectUrl);
+		} else if (isProtectedPath) {
+			router.push("/");
+		}
+
 		return Promise.resolve();
 	};
 
@@ -176,6 +194,13 @@ export function useUser(userId: string) {
 		getCachedData(`user-${userId}`) ? "success" : "loading",
 	);
 	const [error, setError] = useState<string | null>(null);
+
+	const router = useRouter();
+	const pathname = usePathname();
+	const protectedPaths = ["/dashboard", "/servers"];
+	const isProtectedPath = protectedPaths.some((path) =>
+		pathname.startsWith(path),
+	);
 
 	useEffect(() => {
 		if (!userId) {
