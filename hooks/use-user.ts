@@ -52,7 +52,6 @@ export async function getMe(): Promise<Discord.User | null> {
 		const data = await res.json();
 
 		if (data?.username) {
-			localStorage.setItem("user", JSON.stringify(data));
 			setCachedData("me", data);
 			setCachedData("me-timestamp", now);
 			return data;
@@ -112,14 +111,13 @@ export function useMe() {
 	const isLoggedIn = useMemo(() => {
 		if (typeof window === "undefined") return null;
 		try {
-			const localUser = localStorage.getItem("user");
-			console.log("LocalStorage user:", localUser); // Debug localStorage
+			const localUser = getCachedData("me");
+			// console.log("LocalStorage user:", localUser); // Debug localStorage
 			if (!localUser) return null;
-			const userData = JSON.parse(localUser);
-			return userData;
+			return localUser;
 		} catch (err) {
 			console.error("LocalStorage error:", err);
-			localStorage.removeItem("user");
+			clearCache("me");
 			return null;
 		}
 	}, []);
@@ -136,7 +134,7 @@ export function useMe() {
 
 	useEffect(() => {
 		if (isLoggedIn) {
-			setUserData(isLoggedIn);
+			setUserData(isLoggedIn as Discord.User);
 			setStatus("success");
 			return;
 		}
@@ -146,7 +144,7 @@ export function useMe() {
 		getMe()
 			.then((data) => {
 				if (data) {
-					localStorage.setItem("user", JSON.stringify(data));
+					setCachedData("me", data);
 					setUserData(data);
 				}
 				setStatus("success");
