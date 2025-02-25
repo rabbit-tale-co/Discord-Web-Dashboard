@@ -101,6 +101,10 @@ export function useMe() {
 	});
 	const [error, setError] = useState<string | null>(null);
 
+	/* FIXME: after expiry time with clearCache, the user is moved from protected pages
+	 * make it so that the user is not moved from protected pages after expiry time
+	 * just refetch data?
+	 */
 	const protectedPaths = ["/dashboard", "/servers"];
 	const router = useRouter();
 	const pathname = usePathname();
@@ -110,14 +114,38 @@ export function useMe() {
 
 	const isLoggedIn = useMemo(() => {
 		if (typeof window === "undefined") return null;
+
+		const refreshUserData = async () => {
+			try {
+				const data = await getMe();
+				if (data) {
+					setUserData(data);
+					setCachedData("me", data);
+					setCachedData("me-timestamp", Date.now());
+				}
+				return !!data;
+			} catch (err) {
+				console.error("Error refreshing user data:", err);
+				return false;
+			}
+		};
+
 		try {
-			const localUser = getCachedData("me");
-			// console.log("LocalStorage user:", localUser); // Debug localStorage
-			if (!localUser) return null;
-			return localUser;
+			const cached = getCachedData("me");
+			const cacheTimestamp = getCachedData("me-timestamp") as number;
+			const now = Date.now();
+			const CACHE_TIME = 1000 * 60 * 5; // 5 minutes
+
+			if (cached) {
+				// If cache expired, trigger refresh but still return cached data
+				if (!cacheTimestamp || now - cacheTimestamp > CACHE_TIME) {
+					refreshUserData();
+				}
+				return cached;
+			}
+			return null;
 		} catch (err) {
-			console.error("LocalStorage error:", err);
-			clearCache("me");
+			console.error("Cache error:", err);
 			return null;
 		}
 	}, []);
@@ -133,34 +161,11 @@ export function useMe() {
 	};
 
 	useEffect(() => {
-		if (isLoggedIn) {
-			setUserData(isLoggedIn as Discord.User);
-			setStatus("success");
-			return;
-		}
-
-		console.log("isLoggedIn", isLoggedIn);
-
-		getMe()
-			.then((data) => {
-				if (data) {
-					setCachedData("me", data);
-					setUserData(data);
-				}
-				setStatus("success");
-			})
-			.catch((err) => {
-				setError(err.message);
-				setStatus("error");
-			});
-	}, [isLoggedIn]);
-
-	useEffect(() => {
 		if (!isProtectedPath) return;
-		if (!isLoggedIn) {
+		if (!userData && !isLoggedIn) {
 			router.push("/");
 		}
-	}, [isProtectedPath, router, isLoggedIn]);
+	}, [isProtectedPath, router, userData, isLoggedIn]);
 
 	return { userData, status, error, isLoggedIn, logout, login };
 }
