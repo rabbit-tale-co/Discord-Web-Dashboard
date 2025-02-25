@@ -146,14 +146,15 @@ export function useMe() {
 		}
 	}, [isLoggedIn]);
 
-	const loginFn = () => {
-		login();
+	const loginFn = async () => {
+		return login();
 	};
 
 	const logoutFn = async () => {
 		await logout();
 		setUserData(null);
 		setStatus("success");
+		return Promise.resolve();
 	};
 
 	return {
