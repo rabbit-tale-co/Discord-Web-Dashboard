@@ -5,6 +5,7 @@ import {
 	useCallback,
 	useEffect,
 	useLayoutEffect,
+	useMemo,
 } from "react";
 
 import { cn } from "@/lib/utils";
@@ -20,10 +21,7 @@ import {
 	CommandGroup,
 	CommandItem,
 } from "@/components/ui/command";
-import type {
-	SuggestionType,
-	Suggestion,
-} from "@/components/ui/custom-textarea";
+import type { Suggestion } from "@/components/ui/custom-textarea";
 import { getCachedData } from "@/lib/cache";
 import type { GuildData } from "@/types/guild";
 import type { Channel } from "discord.js";
@@ -49,7 +47,12 @@ interface HighlightedTextareaProps
 	disabled?: boolean;
 	suggestions?: Suggestion[];
 	guildId?: string;
-	onSuggestionSelect?: (suggestion: string, type: SuggestionType) => void;
+	onSuggestionSelect?: (suggestion: string) => void;
+}
+
+interface SuggestionState {
+	isOpen: boolean;
+	position: { top: number; left: number } | null;
 }
 
 function HighlightedTextarea({
@@ -65,129 +68,148 @@ function HighlightedTextarea({
 }: HighlightedTextareaProps) {
 	const divRef = useRef<HTMLDivElement>(null);
 	const [cursorPosition, setCursorPosition] = useState<number | null>(null);
-	const [showSuggestions, setShowSuggestions] = useState(false);
-	const [currentTrigger, setCurrentTrigger] = useState<string>("");
-	const [filteredSuggestions, setFilteredSuggestions] = useState<Suggestion[]>(
-		[],
-	);
 	const [guildData, setGuildData] = useState<GuildData | null>(null);
-	const [allSuggestions, setAllSuggestions] =
-		useState<Suggestion[]>(suggestions);
 
-	// Pobieranie dodatkowych danych (np. role, kanały) dla sugestii
+	// Separate states for each trigger type
+	const [variableSuggestion, setVariableSuggestion] = useState<SuggestionState>(
+		{
+			isOpen: false,
+			position: null,
+		},
+	);
+	const [roleSuggestion, setRoleSuggestion] = useState<SuggestionState>({
+		isOpen: false,
+		position: null,
+	});
+	const [channelSuggestion, setChannelSuggestion] = useState<SuggestionState>({
+		isOpen: false,
+		position: null,
+	});
+
+	// Pobieranie danych o serwerze
 	useEffect(() => {
 		if (!guildId) return;
 
 		const guild = getCachedData<GuildData>(`guild-${guildId}`);
 		setGuildData(guild?.data || null);
+	}, [guildId]);
 
-		if (guild?.data) {
-			const roleSuggestions: Suggestion[] = (guild.data.roles || []).map(
-				(role) => ({
-					name: role.name,
-					id: role.id,
-					type: "role",
-					color: role.color,
-				}),
-			);
+	// Filtrowanie ról i kanałów
+	const filteredRoles = useMemo(() => {
+		if (!guildData) return [];
+		return guildData.roles || [];
+	}, [guildData]);
 
-			const channelSuggestions: Suggestion[] = (guild.data.channels || [])
-				.filter((channel) => channel.type === 0)
-				.map((channel) => ({
-					name: channel.name,
-					id: channel.id,
-					type: "channel",
-				}));
+	const filteredChannels = useMemo(() => {
+		if (!guildData) return [];
+		return (guildData.channels || []).filter((channel) => channel.type === 0);
+	}, [guildData]);
 
-			setAllSuggestions([
-				...suggestions,
-				...roleSuggestions,
-				...channelSuggestions,
-			]);
-		}
-	}, [guildId, suggestions]);
+	// Handler klawiatury – obsługa triggerów
+	const handleKeyDown = useCallback(
+		(e: React.KeyboardEvent<HTMLDivElement>) => {
+			if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "y")) {
+				return;
+			}
 
-	// Ustalanie triggerów dla sugestii
-	const triggers = {
-		"{": "placeholder",
-		"@": "role",
-		"#": "channel",
-	} as const;
+			const selection = window.getSelection();
+			if (!selection || !selection.rangeCount) return;
 
-	// Renderowanie zawartości z podświetleniem składników (np. tekst w nawiasach, role, kanały)
-	const renderContent = () => {
-		const text = value || placeholder || "";
-		let result = "";
-		let buffer = "";
-		let inPlaceholder = false;
-		let inMention = false;
+			const range = selection.getRangeAt(0);
+			const rect = range.getBoundingClientRect();
+			const divRect = divRef.current?.getBoundingClientRect();
+			if (!divRect) return;
 
-		const chars = text.split("");
-		for (let i = 0; i < chars.length; i++) {
-			const char = chars[i];
+			const position = {
+				top: rect.bottom - divRect.top,
+				left: rect.left - divRect.left,
+			};
 
-			// Start of placeholder or mention
-			if (char === "{" || ((char === "@" || char === "#") && !inPlaceholder)) {
-				// Flush buffer if exists
-				if (buffer) {
-					result += buffer;
-					buffer = "";
+			switch (e.key) {
+				case "{":
+				case "@":
+				case "#": {
+					e.preventDefault();
+
+					// Insert a temporary marker at cursor position
+					const marker = document.createTextNode("\u200B"); // Zero-width space
+					range.insertNode(marker);
+					range.setStartAfter(marker);
+					range.collapse(true);
+					selection.removeAllRanges();
+					selection.addRange(range);
+
+					if (e.key === "{") {
+						setVariableSuggestion({ isOpen: true, position });
+						setRoleSuggestion({ isOpen: false, position: null });
+						setChannelSuggestion({ isOpen: false, position: null });
+					} else if (e.key === "@") {
+						setRoleSuggestion({ isOpen: true, position });
+						setVariableSuggestion({ isOpen: false, position: null });
+						setChannelSuggestion({ isOpen: false, position: null });
+					} else {
+						setChannelSuggestion({ isOpen: true, position });
+						setVariableSuggestion({ isOpen: false, position: null });
+						setRoleSuggestion({ isOpen: false, position: null });
+					}
+					break;
 				}
+			}
+		},
+		[],
+	);
 
-				if (char === "{") {
-					inPlaceholder = true;
-					buffer = char;
-				} else {
-					inMention = true;
-					buffer = char;
+	const handleSuggestionSelect = useCallback(
+		(type: "variable" | "role" | "channel", name: string, id: string) => {
+			const selection = window.getSelection();
+			if (!selection || !selection.rangeCount) return;
+
+			const range = selection.getRangeAt(0);
+			let insertText = "";
+
+			switch (type) {
+				case "variable":
+					insertText = `{${name}}`;
+					setVariableSuggestion({ isOpen: false, position: null });
+					break;
+				case "role":
+					insertText = `<@&${id}>`;
+					setRoleSuggestion({ isOpen: false, position: null });
+					break;
+				case "channel":
+					insertText = `<#${id}>`;
+					setChannelSuggestion({ isOpen: false, position: null });
+					break;
+			}
+
+			// Find and remove the marker
+			const div = divRef.current;
+			if (div) {
+				const walker = document.createTreeWalker(
+					div,
+					NodeFilter.SHOW_TEXT,
+					null,
+				);
+				let node = walker.nextNode();
+				while (node) {
+					if (node.textContent === "\u200B") {
+						const textNode = document.createTextNode(insertText);
+						node.parentNode?.replaceChild(textNode, node);
+						range.setStartAfter(textNode);
+						range.collapse(true);
+						selection.removeAllRanges();
+						selection.addRange(range);
+						break;
+					}
+					node = walker.nextNode();
 				}
-				continue;
 			}
 
-			// End of placeholder
-			if (char === "}" && inPlaceholder) {
-				buffer += char;
-				result += `<span class="bg-foreground text-background">${buffer}</span>`;
-				buffer = "";
-				inPlaceholder = false;
-				continue;
-			}
-
-			// End of mention (space or special char)
-			if (
-				inMention &&
-				(char === " " || char === "{" || char === "@" || char === "#")
-			) {
-				if (buffer.length > 1) {
-					result += `<span class="text-blue-500">${buffer}</span>`;
-				} else {
-					result += buffer;
-				}
-				result += char;
-				buffer = "";
-				inMention = false;
-				continue;
-			}
-
-			// Add to buffer
-			if (inPlaceholder || inMention) {
-				buffer += char;
-			} else {
-				result += char;
-			}
-		}
-
-		// Flush remaining buffer
-		if (buffer) {
-			if (inMention && buffer.length > 1) {
-				result += `<span class="text-blue-500">${buffer}</span>`;
-			} else {
-				result += buffer;
-			}
-		}
-
-		return result;
-	};
+			const event = new Event("input", { bubbles: true });
+			divRef.current?.dispatchEvent(event);
+		},
+		[],
+	);
 
 	// Handler input – zapisuje pozycję kursora i aktualizuje wartość
 	const handleInput = useCallback(
@@ -270,61 +292,30 @@ function HighlightedTextarea({
 		});
 	}, [cursorPosition]);
 
-	// Handler klawiatury – obsługa triggerów oraz natywne undo/redo
-	const handleKeyDown = useCallback(
-		(e: React.KeyboardEvent<HTMLDivElement>) => {
-			// Pozwól na undo/redo (ctrl/⌘+Z lub ctrl/⌘+Y)
-			if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "y")) {
-				return;
-			}
-			const trigger = e.key;
-			if (trigger in triggers) {
-				e.preventDefault();
-				const selection = window.getSelection();
-				if (selection) {
-					const pos = selection.anchorOffset;
-					const currentText = String(value);
-					const newValue =
-						currentText.slice(0, pos) + trigger + currentText.slice(pos);
+	// Renderowanie zawartości z podświetleniem zmiennych
+	const renderContent = useCallback(() => {
+		const text = value || placeholder || "";
+		let result = "";
+		let lastIndex = 0;
 
-					setCurrentTrigger(trigger);
-					setFilteredSuggestions(
-						allSuggestions.filter(
-							(s) => s.type === triggers[trigger as keyof typeof triggers],
-						),
-					);
-					onChange?.(newValue);
-					setShowSuggestions(true);
-				}
-			}
-		},
-		[value, onChange, allSuggestions, triggers],
-	);
+		// Znajdujemy wszystkie zmienne w tekście
+		const regex = /\{([^}]+)\}/g;
+		let match: RegExpExecArray | null = regex.exec(text);
 
-	const handleSuggestionSelect = useCallback(
-		(suggestion: string) => {
-			const currentText = String(value);
-			let newValue = currentText;
+		while (match !== null) {
+			// Dodaj tekst przed zmienną
+			result += text.slice(lastIndex, match.index);
+			// Dodaj zmienną w mark
+			result += `<mark class="bg-foreground/10 text-foreground px-1 rounded">${match[0]}</mark>`;
+			lastIndex = match.index + match[0].length;
+			match = regex.exec(text);
+		}
 
-			if (currentTrigger === "{") {
-				newValue = currentText.replace(/\{$/, `{${suggestion}}`);
-			} else if (currentTrigger === "@" || currentTrigger === "#") {
-				newValue = currentText.replace(
-					new RegExp(`\\${currentTrigger}$`),
-					`${currentTrigger}${suggestion}`,
-				);
-			}
+		// Dodaj pozostały tekst
+		result += text.slice(lastIndex);
 
-			onChange?.(newValue);
-			onSuggestionSelect?.(
-				suggestion,
-				triggers[currentTrigger as keyof typeof triggers],
-			);
-			setShowSuggestions(false);
-			setCurrentTrigger("");
-		},
-		[value, onChange, currentTrigger, onSuggestionSelect, triggers],
-	);
+		return result;
+	}, [value, placeholder]);
 
 	return (
 		<div className="relative">
@@ -341,65 +332,165 @@ function HighlightedTextarea({
 					"border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50",
 					"min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none",
 					"focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-					"whitespace-pre-wrap absolute inset-0 text-transparent caret-foreground",
+					"whitespace-pre-wrap [&_mark]:bg-foreground/10 [&_mark]:text-foreground [&_mark]:px-1 [&_mark]:rounded",
 					className,
 				)}
 			>
 				{value || placeholder || ""}
 			</div>
-			<div
-				aria-hidden="true"
-				className={cn(
-					"border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50",
-					"min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none",
-					"focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-					"whitespace-pre-wrap pointer-events-none",
-					className,
-				)}
-				// biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
-				dangerouslySetInnerHTML={{ __html: renderContent() }}
-			/>
-			{showSuggestions && filteredSuggestions.length > 0 && (
-				<Popover open={showSuggestions} onOpenChange={setShowSuggestions}>
+
+			{/* Variables Popover */}
+			{variableSuggestion.isOpen && variableSuggestion.position && (
+				<Popover
+					key="variable-popover"
+					open={variableSuggestion.isOpen}
+					onOpenChange={(open) =>
+						setVariableSuggestion({ ...variableSuggestion, isOpen: open })
+					}
+					modal={true}
+				>
 					<PopoverTrigger asChild>
-						<div className="absolute" />
+						<div
+							className="absolute w-0 h-0"
+							style={{
+								top: `${variableSuggestion.position.top}px`,
+								left: `${variableSuggestion.position.left}px`,
+							}}
+						/>
 					</PopoverTrigger>
-					<PopoverContent className="w-80 p-0" align="start" sideOffset={5}>
+					<PopoverContent
+						align="start"
+						className="w-[200px] p-0"
+						onOpenAutoFocus={(e) => e.preventDefault()}
+					>
 						<Command>
 							<CommandList>
-								<CommandEmpty>No suggestions found.</CommandEmpty>
+								<CommandEmpty>No placeholders found.</CommandEmpty>
 								<CommandGroup>
-									{filteredSuggestions.map((suggestion) => (
+									{suggestions.map((item) => (
 										<CommandItem
-											key={suggestion.name}
-											onSelect={() => handleSuggestionSelect(suggestion.name)}
+											key={item.id}
+											onSelect={() =>
+												handleSuggestionSelect("variable", item.name, item.id)
+											}
+											className="flex items-center gap-2"
 										>
-											{suggestion.type === "placeholder" ? (
-												<div className="flex flex-col">
-													<div className="font-medium">
-														{`{${suggestion.name}}`}
-													</div>
+											<div className="flex flex-col">
+												<div className="font-medium">{item.name}</div>
+												{item.description && (
 													<div className="text-sm text-muted-foreground">
-														{suggestion.description}
-														{suggestion.example &&
-															` (e.g., ${suggestion.example})`}
+														{item.description}
+														{item.example && ` (e.g., ${item.example})`}
 													</div>
-												</div>
-											) : suggestion.type === "role" ? (
-												<div className="flex items-center">
-													<div
-														className="mr-2 h-3 w-3 rounded-full"
-														style={{
-															backgroundColor: `#${suggestion.color
-																?.toString(16)
-																.padStart(6, "0")}`,
-														}}
-													/>
-													{suggestion.name}
-												</div>
-											) : (
-												<div># {suggestion.name}</div>
-											)}
+												)}
+											</div>
+										</CommandItem>
+									))}
+								</CommandGroup>
+							</CommandList>
+						</Command>
+					</PopoverContent>
+				</Popover>
+			)}
+
+			{/* Roles Popover */}
+			{roleSuggestion.isOpen && roleSuggestion.position && (
+				<Popover
+					key="role-popover"
+					open={roleSuggestion.isOpen}
+					onOpenChange={(open) =>
+						setRoleSuggestion({ ...roleSuggestion, isOpen: open })
+					}
+					modal={true}
+				>
+					<PopoverTrigger asChild>
+						<div
+							className="absolute w-0 h-0"
+							style={{
+								top: `${roleSuggestion.position.top}px`,
+								left: `${roleSuggestion.position.left}px`,
+							}}
+						/>
+					</PopoverTrigger>
+					<PopoverContent
+						align="start"
+						className="w-[200px] p-0"
+						onOpenAutoFocus={(e) => e.preventDefault()}
+					>
+						<Command>
+							<CommandList>
+								<CommandEmpty>No roles found.</CommandEmpty>
+								<CommandGroup>
+									{filteredRoles.map((role) => (
+										<CommandItem
+											key={role.id}
+											onSelect={() =>
+												handleSuggestionSelect("role", role.name, role.id)
+											}
+											className="flex items-center gap-2"
+										>
+											<div className="flex items-center gap-2">
+												<div
+													className="h-3 w-3 rounded-full flex-shrink-0"
+													style={{
+														backgroundColor: `#${role.color?.toString(16).padStart(6, "0")}`,
+													}}
+												/>
+												<span>{role.name}</span>
+											</div>
+										</CommandItem>
+									))}
+								</CommandGroup>
+							</CommandList>
+						</Command>
+					</PopoverContent>
+				</Popover>
+			)}
+
+			{/* Channels Popover */}
+			{channelSuggestion.isOpen && channelSuggestion.position && (
+				<Popover
+					key="channel-popover"
+					open={channelSuggestion.isOpen}
+					onOpenChange={(open) =>
+						setChannelSuggestion({ ...channelSuggestion, isOpen: open })
+					}
+					modal={true}
+				>
+					<PopoverTrigger asChild>
+						<div
+							className="absolute w-0 h-0"
+							style={{
+								top: `${channelSuggestion.position.top}px`,
+								left: `${channelSuggestion.position.left}px`,
+							}}
+						/>
+					</PopoverTrigger>
+					<PopoverContent
+						align="start"
+						className="w-[200px] p-0"
+						onOpenAutoFocus={(e) => e.preventDefault()}
+					>
+						<Command>
+							<CommandList>
+								<CommandEmpty>No channels found.</CommandEmpty>
+								<CommandGroup>
+									{filteredChannels.map((channel) => (
+										<CommandItem
+											key={channel.id}
+											onSelect={() =>
+												handleSuggestionSelect(
+													"channel",
+													channel.name,
+													channel.id,
+												)
+											}
+											className="flex items-center gap-2"
+										>
+											<div className="flex items-center gap-2">
+												<span className="flex-shrink-0">#</span>
+												<span>{channel.name}</span>
+											</div>
 										</CommandItem>
 									))}
 								</CommandGroup>

@@ -34,20 +34,6 @@ const SUGGESTIONS: Suggestion[] = [
 		example: "John",
 		type: "placeholder",
 	},
-	{ name: "admin", description: "Admin role", example: "@admin", type: "role" },
-	{ name: "mod", description: "Moderator role", example: "@mod", type: "role" },
-	{
-		name: "general",
-		description: "General chat",
-		example: "#general",
-		type: "channel",
-	},
-	{
-		name: "announcements",
-		description: "Announcements channel",
-		example: "#announcements",
-		type: "channel",
-	},
 ];
 
 export function MessageField({
