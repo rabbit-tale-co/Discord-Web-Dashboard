@@ -1,9 +1,24 @@
 export function deepEqual(a: unknown, b: unknown): boolean {
 	// Convert form values to consistent format
 	const normalize = (val: unknown): unknown => {
-		if (val === "" || val === null || val === undefined) return 0;
-		if (typeof val === "string" && !Number.isNaN(Number(val)))
-			return Number(val);
+		// Handle null/undefined consistently
+		if (val === null || val === undefined || val === "null") return "";
+
+		// Handle strings and numbers
+		if (typeof val === "string") {
+			const trimmed = val.trim();
+			// Only convert to number if it's actually numeric
+			if (trimmed !== "" && !Number.isNaN(Number(trimmed))) {
+				return Number(trimmed);
+			}
+			return trimmed; // Keep empty string as empty string
+		}
+
+		if (typeof val === "number") {
+			return Number.isNaN(val) ? "" : val;
+		}
+
+		// Rest of the normalize function stays the same
 		if (Array.isArray(val)) {
 			// Sort arrays to ensure consistent comparison
 			return [...val].map(normalize).sort((x: unknown, y: unknown) => {

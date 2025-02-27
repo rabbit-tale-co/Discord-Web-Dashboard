@@ -160,31 +160,58 @@ export function ArrayField({
 											name={`${name}.${index}.level`}
 											render={({ field }) => (
 												<FormItem>
-													<FormLabel>Level</FormLabel>
+													<FormLabel>
+														<div className="flex w-full items-center gap-2 justify-between">
+															Level
+															{field.value === null && (
+																<FormMessage className="text-red-500 leading-none">
+																	Level is required and must be 0 or greater
+																</FormMessage>
+															)}
+														</div>
+													</FormLabel>
 													<FormControl>
 														<Input
 															type="number"
+															min="0"
+															step="1"
 															{...field}
-															value={
-																field.value === "" ? "" : Number(field.value)
-															}
+															value={field.value ?? ""}
 															onChange={(e) => {
-																const value =
-																	e.target.value === ""
-																		? ""
-																		: Number(e.target.value);
-																if (!isNaN(value)) {
-																	field.onChange(value);
+																const value = e.target.value;
+																if (value === "") {
+																	field.onChange(null);
+																} else {
+																	const numValue = Number.parseInt(value, 10);
+																	if (
+																		!Number.isNaN(numValue) &&
+																		numValue >= 0
+																	) {
+																		field.onChange(numValue);
+																	}
 																}
 															}}
-															onKeyPress={(e) => {
-																if (!/[\d\b.]/.test(e.key)) {
+															onKeyDown={(e) => {
+																// Allow only numbers, backspace, delete, arrow keys
+																if (
+																	!/^[0-9]$/.test(e.key) &&
+																	![
+																		"Backspace",
+																		"Delete",
+																		"ArrowLeft",
+																		"ArrowRight",
+																		"Tab",
+																	].includes(e.key)
+																) {
 																	e.preventDefault();
 																}
 															}}
+															className={cn(
+																field.value === null &&
+																	"border-red-500 focus:border-red-500",
+															)}
 														/>
 													</FormControl>
-													<FormMessage />
 												</FormItem>
 											)}
 										/>
