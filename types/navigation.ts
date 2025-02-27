@@ -88,16 +88,15 @@ export interface NavMainItem {
 }
 
 export interface NavItem {
+	type: "small" | "large";
 	title: string;
 	description: string;
-	url?: string;
-	icon?: React.ElementType;
+	url: string;
 	iconName?: string;
-	items?: NavItem[];
 	minWidth?: number;
 	minHeight?: string;
-	type: "small" | "large";
-	image?: string;
+	premium?: boolean;
+	enabled?: boolean;
 }
 
 export interface NavCategory {

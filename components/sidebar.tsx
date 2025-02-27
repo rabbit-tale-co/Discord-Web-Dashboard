@@ -4,7 +4,7 @@ import * as Icon from "@/components/icons";
 import { login } from "@/hooks/use-user";
 import { Button } from "@/components/ui/button";
 import { NavUser } from "@/components/dashbaord/nav-user";
-import { useAuth } from "@/app/authContext";
+import { useAuth } from "@/context/authContext";
 import {
 	Sidebar,
 	SidebarContent,

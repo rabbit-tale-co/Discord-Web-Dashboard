@@ -12,6 +12,20 @@ import NumberFlow from "@number-flow/react";
 import React from "react";
 
 export default function Hero() {
+	const addToDiscord = () => {
+		const addBotWindow = window.open(
+			`https://discord.com/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&permissions=8&response_type=code&redirect_uri=${process.env.NEXT_PUBLIC_DASHBOARD_URL}/api/auth/guild&integration_type=0&scope=bot+applications.commands+guilds+identify+guilds.channels.read+voice+payment_sources.country_code+dm_channels.messages.write+dm_channels.messages.read+presences.write+messages.read+email+guilds.members.read`,
+			"_blank",
+		);
+
+		// Listen for message from new window
+		window.addEventListener("message", (event) => {
+			if (event.data === "guild-success") {
+				addBotWindow?.close();
+			}
+		});
+	};
+
 	return (
 		<div className="w-full mx-auto">
 			<div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 items-stretch">
@@ -28,11 +42,9 @@ export default function Hero() {
 						community.
 					</p>
 					<div className="flex flex-col sm:flex-row gap-4">
-						<Button asChild variant="discord" size="xl">
-							<Link href="https://discord.com/oauth2/authorize?client_id=1234567890&permissions=8&scope=bot">
-								Add to Discord
-								<SolidDiscord size={22} />
-							</Link>
+						<Button variant="discord" size="xl" onClick={() => addToDiscord()}>
+							Add to Discord
+							<SolidDiscord size={22} />
 						</Button>
 						<Button asChild variant="ghost" size="xl">
 							<Link href="/plugins">

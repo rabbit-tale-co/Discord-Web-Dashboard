@@ -16,7 +16,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
-import { useAuth } from "@/app/authContext";
+import { useAuth } from "@/context/authContext";
 import { useSidebar } from "./navigation/sidebar";
 import { UserInfo } from "./user-info";
 

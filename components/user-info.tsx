@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAuth } from "@/app/authContext";
+import { useAuth } from "@/context/authContext";
 import avatarUrl from "@/lib/is-gif";
 import {
 	ChevronsUpDown,

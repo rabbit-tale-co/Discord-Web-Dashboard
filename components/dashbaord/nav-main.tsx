@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import {
@@ -20,7 +20,8 @@ import {
 import type { NavSection } from "@/types/navigation";
 import * as Icon from "@/components/icons";
 import { navigationConfig } from "../navigation/config";
-import { useGuild } from "@/hooks/use-guilds";
+import { useServerPlugins } from "@/context/plugins-context";
+import { Badge } from "../ui/badge";
 
 // Resolve icon on client side
 const resolveIcon = (iconName: string) => {
@@ -31,13 +32,23 @@ const resolveIcon = (iconName: string) => {
 export function NavMain({
 	section,
 	guildId,
-}: { section: NavSection; guildId: string }) {
+}: {
+	section: NavSection;
+	guildId: string;
+}) {
+	const { pluginsData } = useServerPlugins();
+
+	const enabledPlugins = useMemo(() => {
+		return pluginsData.filter((plugin) => plugin.enabled);
+	}, [pluginsData]);
+
 	if (!section) return null;
 
-	const SectionIcon = section.iconName ? resolveIcon(section.iconName) : null;
+	//const SectionIcon = section.iconName ? resolveIcon(section.iconName) : null;
 
 	return (
-		<SidebarGroup>
+		<SidebarGroup key={`plugins-${guildId}`}>
+			{/* HOME */}
 			<SidebarMenu>
 				<Collapsible
 					asChild
@@ -49,38 +60,65 @@ export function NavMain({
 							<SidebarGroupLabel asChild className="cursor-pointer">
 								<div className="flex items-center gap-2">
 									<ChevronRight className="transition-transform duration-150" />
-									{/* {SectionIcon && <SectionIcon size={22} />} */}
+									Home
+								</div>
+							</SidebarGroupLabel>
+						</CollapsibleTrigger>
+						<CollapsibleContent className="ml-2.5">
+							<SidebarMenuSub>
+								<SidebarMenuItem>
+									<SidebarMenuButton asChild>
+										<Link href={`/dashboard/${guildId}`}>Dashboard</Link>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							</SidebarMenuSub>
+						</CollapsibleContent>
+					</SidebarMenuItem>
+				</Collapsible>
+			</SidebarMenu>
+
+			{/* PLUGINS */}
+			<SidebarMenu>
+				<Collapsible
+					asChild
+					defaultOpen
+					className="group/collapsible [&[data-state=open]>div>svg:first-child]:rotate-90"
+				>
+					<SidebarMenuItem>
+						<CollapsibleTrigger asChild>
+							<SidebarGroupLabel asChild className="cursor-pointer">
+								<div className="flex items-center gap-2">
+									<ChevronRight className="transition-transform duration-150" />
 									{section.title}
+									{/* check if menu is open */}
+									{section.title === "Plugins" && (
+										<Badge variant={"outline"} className="ml-auto">
+											{enabledPlugins.length} /{" "}
+											{section.categories.reduce(
+												(acc, category) => acc + category.items.length,
+												0,
+											)}
+										</Badge>
+									)}
 								</div>
 							</SidebarGroupLabel>
 						</CollapsibleTrigger>
 						<CollapsibleContent className="ml-2.5">
 							<SidebarMenuSub>
 								{section.categories.map((category) => (
-									<Collapsible
-										key={category.title}
-										className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
-									>
+									<Collapsible key={category.title}>
 										<CollapsibleTrigger asChild className="relative">
 											<SidebarMenuButton>
 												<ChevronRight className="transition-transform duration-150" />
-												{/* {category.iconName && (
-													<React.Fragment>
-														{(() => {
-															const ItemIcon = resolveIcon(category.iconName);
-															return <ItemIcon size={22} />;
-														})()}
-													</React.Fragment>
-												)} */}
 												{category.title}
-												{/* <SidebarMenuBadge className="absolute right-1 top-1/2 -translate-y-1/2">
-														{(() => {
-															const active = category.items.filter(
-																(item) => item.status === "active",
-															).length;
-															return `${active}/${category.items.length}`;
-														})()}
-												</SidebarMenuBadge> */}
+												<Badge variant={"outline"} className="ml-auto">
+													{
+														category.items.filter((item) =>
+															enabledPlugins.some((p) => p.id === item.url),
+														).length
+													}{" "}
+													/ {category.items.length}
+												</Badge>
 											</SidebarMenuButton>
 										</CollapsibleTrigger>
 										<CollapsibleContent className="ml-2.5">
@@ -89,20 +127,20 @@ export function NavMain({
 													<SidebarMenuItem key={item.title}>
 														<SidebarMenuButton asChild>
 															<Link
-																href={
-																	`/dashboard/${guildId}/plugin/${item.url}` ||
-																	""
-																}
+																href={`/dashboard/${guildId}/plugin/${item.url}`}
 															>
-																{/* {item.iconName &&
-																	(() => {
-																		const ItemIcon = resolveIcon(item.iconName);
-																		return <ItemIcon size={22} />;
-																	})()} */}
 																{item.title}
+																<span
+																	className={`absolute -right-5 size-1.5 rounded-full ${
+																		enabledPlugins.some(
+																			(p) => p.id === item.url,
+																		)
+																			? "bg-green-500"
+																			: "bg-red-500"
+																	}`}
+																/>
 															</Link>
 														</SidebarMenuButton>
-														<span className="absolute -right-4 top-1/2 -translate-y-1/2 size-1.5 rounded-full bg-muted-foreground/50" />
 													</SidebarMenuItem>
 												))}
 											</SidebarMenuSub>
@@ -130,14 +168,6 @@ export function NavMainMobile() {
 						<CollapsibleTrigger asChild>
 							<SidebarMenuButton className="w-full">
 								<ChevronRight className="transition-transform duration-150" />
-								{/* {section.iconName && (
-									<React.Fragment>
-										{(() => {
-											const SectionIcon = resolveIcon(section.iconName);
-											return SectionIcon && <SectionIcon size={22} />;
-										})()}
-									</React.Fragment>
-								)} */}
 								{section.title}
 							</SidebarMenuButton>
 						</CollapsibleTrigger>
@@ -145,26 +175,12 @@ export function NavMainMobile() {
 							<SidebarMenuSub>
 								{section.categories.map((category) => (
 									<React.Fragment key={category.title}>
-										{/* Only show items, skip category headers */}
 										{category.items.map((item) => (
 											<SidebarMenuItem key={item.title}>
 												<SidebarMenuButton asChild>
 													<Link href={`plugin/${item.url}` || ""}>
-														{/* {item.iconName && (
-															<React.Fragment>
-																{(() => {
-																	const ItemIcon = resolveIcon(item.iconName);
-																	return ItemIcon && <ItemIcon size={18} />;
-																})()}
-															</React.Fragment>
-														)} */}
 														<span className="flex flex-col">
 															<span>{item.title}</span>
-															{/* {item.description && (
-																<span className="text-xs text-muted-foreground line-clamp-1">
-																	{item.description}
-																</span>
-															)} */}
 														</span>
 													</Link>
 												</SidebarMenuButton>

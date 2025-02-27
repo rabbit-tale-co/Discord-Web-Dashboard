@@ -1,5 +1,18 @@
 import * as Icon from "@/components/icons";
-import type { NavSection } from "@/types/navigation";
+import type { NavItem, NavSection } from "@/types/navigation";
+import { useEffect, useState } from "react";
+import type { Plugin } from "@/hooks/use-plugins";
+import type { GuildData } from "@/types/guild";
+import usePlugins from "@/hooks/use-plugins";
+
+// Add type for available plugin structure
+interface AvailablePlugin extends Plugin {
+	category: string;
+	title: string;
+	description: string;
+	iconSolid: string;
+	premium: boolean;
+}
 
 export const navigationConfig: NavSection[] = [
 	{
@@ -200,3 +213,84 @@ export const navigationConfig: NavSection[] = [
 		],
 	},
 ];
+
+export function useNavigationConfig(plugins?: Plugin[]) {
+	const [config, setConfig] = useState<NavSection[]>([]);
+	const [availablePlugins, setAvailablePlugins] = useState<AvailablePlugin[]>(
+		[],
+	);
+
+	// Fetch available plugins only once
+	useEffect(() => {
+		async function fetchAvailablePlugins() {
+			try {
+				const response = await fetch("/api/plugins/available")
+					.then((res) => res.json())
+					.catch((err) => {
+						console.error("Error fetching available plugins:", err);
+					});
+
+				// console.log("Available plugins fetched:", data);
+				if (response) {
+					setAvailablePlugins(response);
+				}
+			} catch (error) {
+				console.error("Error loading available plugins:", error);
+			}
+		}
+
+		fetchAvailablePlugins();
+	}, []); // Only fetch once
+
+	// Update config when either plugins or availablePlugins change
+	useEffect(() => {
+		if (!availablePlugins.length) return;
+
+		// console.log("Updating navigation config with plugins:", plugins);
+
+		// Group by category and sort categories
+		const pluginsByCategory = availablePlugins.reduce(
+			(acc: Record<string, NavItem[]>, plugin: AvailablePlugin) => {
+				if (!acc[plugin.category]) {
+					acc[plugin.category] = [];
+				}
+				const isEnabled = plugins?.find((p) => p.id === plugin.id)?.enabled;
+				// console.log(`Plugin ${plugin.id} enabled status:`, isEnabled);
+
+				acc[plugin.category].push({
+					type: "small",
+					title: plugin.title,
+					description: plugin.description,
+					url: plugin.id,
+					iconName: plugin.iconSolid,
+					premium: plugin.premium,
+					enabled: isEnabled,
+				});
+				return acc;
+			},
+			{},
+		);
+
+		// Sort plugins within each category
+		for (const items of Object.values(pluginsByCategory)) {
+			(items as NavItem[]).sort((a, b) => a.title.localeCompare(b.title));
+		}
+
+		const pluginsSection: NavSection = {
+			title: "Plugins",
+			iconName: "SolidLogo",
+			categories: Object.entries(pluginsByCategory)
+				.sort(([a], [b]) => a.localeCompare(b))
+				.map(([category, items]) => ({
+					title: category,
+					iconName: "SolidLogo",
+					items: items as NavItem[],
+				})),
+		};
+
+		// console.log("New navigation config:", [pluginsSection]);
+		setConfig([pluginsSection]);
+	}, [plugins, availablePlugins]); // Update when either changes
+
+	return config;
+}

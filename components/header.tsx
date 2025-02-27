@@ -4,7 +4,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import * as Icon from "@/components/icons";
-import { useAuth } from "@/app/authContext";
+import { useAuth } from "@/context/authContext";
 import { UserInfo } from "@/components/user-info";
 import type { NavSection } from "@/types/navigation";
 import { ExpandedMenu } from "./navigation/expanded-menu";

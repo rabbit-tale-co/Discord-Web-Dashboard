@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@/app/authContext";
+import { useAuth } from "@/context/authContext";
 import { getCachedData, setCachedData } from "@/lib/cache";
+import type { GuildFeature } from "@/types/guild";
 
 interface Server {
 	id: string;
@@ -18,6 +19,49 @@ interface Server {
 interface CachedGuild {
 	data: Server[] | GuildData;
 	expiresAt: number;
+}
+
+interface GuildDetails {
+	id: string;
+	name: string;
+	icon: string | null;
+	features: GuildFeature[];
+	owner_id: string;
+	approximate_member_count: number;
+	description?: string | null;
+	approximate_presence_count?: number;
+	premium_tier?: number;
+	premium_subscription_count?: number;
+	createdAt: string;
+}
+
+export interface GuildData {
+	category_count: number;
+	text_channel_count: number;
+	voice_channel_count: number;
+	guild_details: GuildDetails;
+	roles: {
+		id: string;
+		name: string;
+		color: number;
+		position: number;
+		permissions: string;
+		managed: boolean;
+		mentionable: boolean;
+		icon?: string | null;
+		unicodeEmoji?: string | null;
+	}[];
+	rolesCount: number;
+	created_at: string;
+	channels: Channel[];
+}
+
+export interface Channel {
+	id: string;
+	name: string;
+	type: number;
+	parent_id?: string;
+	position: number;
 }
 
 export const useGuilds = () => {
@@ -63,33 +107,6 @@ export const useGuilds = () => {
 	return { guilds, status, error };
 };
 
-export interface GuildData {
-	category_count: number;
-	text_channel_count: number;
-	voice_channel_count: number;
-	guild_details: {
-		id: string;
-		name: string;
-		icon: string;
-		features: string[];
-		owner_id: string;
-		approximate_member_count: number;
-		description?: string;
-		approximate_presence_count?: number;
-		premium_tier?: number;
-		premium_subscription_count?: number;
-		region?: string;
-	};
-	roles: {
-		id: string;
-		name: string;
-		color: number;
-		position: number;
-	}[];
-	rolesCount: number;
-	created_at: string;
-}
-
 export function useGuild(id: string) {
 	const [guildData, setGuildData] = useState<GuildData | null>(() => {
 		const cached = getCachedData(`guild-${id}`) as CachedGuild;
@@ -122,6 +139,7 @@ export function useGuild(id: string) {
 						text_channel_count: data.text_channel_count,
 						voice_channel_count: data.voice_channel_count,
 						guild_details: data.guild_details,
+						channels: data.channels,
 						roles: data.roles,
 						rolesCount: data.roles.length,
 						region: data.region,

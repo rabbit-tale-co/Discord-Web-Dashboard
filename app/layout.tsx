@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/app/authContext";
+import { AuthProvider } from "@/context/authContext";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarProvider } from "@/components/navigation/sidebar";
@@ -10,6 +10,7 @@ import { SidebarMobile } from "@/components/sidebar";
 import { Analytics } from "@vercel/analytics/react";
 import type { Robots } from "next/dist/lib/metadata/types/metadata-types";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { PluginsProvider } from "@/context/plugins-context";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",

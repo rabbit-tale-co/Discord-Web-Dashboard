@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import type { Guild } from "discord.js";
+import type { Channel, Guild, Role } from "discord.js";
 
 export async function GET(request: Request) {
 	try {
@@ -36,14 +36,70 @@ export async function GET(request: Request) {
 		}
 
 		const guildData = await response.json();
+
+		const roles = guildData.guild_details.roles;
+		const filteredRoles = roles.filter((role: Role) => {
+			// Skip @everyone role
+			if (role.name === "@everyone") return false;
+
+			// Skip Discord-managed roles (including bot roles)
+			if (role.managed) return false;
+
+			return true;
+		});
+
+		// Sort channels by position
+		const channels = guildData.guild_details.channels || [];
+		const sortedChannels = Array.isArray(channels)
+			? [...channels].sort((a, b) => {
+					// First sort by category
+					if (a.parent_id !== b.parent_id) {
+						// If one has a parent and the other doesn't, put the one without parent first
+						if (!a.parent_id) return -1;
+						if (!b.parent_id) return 1;
+
+						// Find the categories and compare their positions
+						const categoryA = channels.find(
+							(c: Channel) => c.id === a.parent_id,
+						);
+						const categoryB = channels.find(
+							(c: Channel) => c.id === b.parent_id,
+						);
+
+						if (categoryA && categoryB) {
+							return categoryA.position - categoryB.position;
+						}
+					}
+
+					// Then sort by position within the same category
+					return a.position - b.position;
+				})
+			: [];
+
+		// Make sure we have a valid array for filtered guild data
+		const guildDataFiltered = {
+			...guildData,
+			guild_details: {
+				...guildData.guild_details,
+				channels: sortedChannels,
+				roles: filteredRoles || [],
+			},
+		};
+
+		const members = guildData.guild_details.members;
+		const emojis = guildData.guild_details.emojis;
+		const stickers = guildData.guild_details.stickers;
+		const bans = guildData.guild_details.bans;
+
 		const timestamp =
-			Number(BigInt(guildData.guild_details.id) >> BigInt(22)) + 1420070400000;
+			Number(BigInt(guildDataFiltered.guild_details.id) >> BigInt(22)) +
+			1420070400000;
 		const created_at = new Date(timestamp).toISOString();
 
 		// console.log(created_at);
 		// Add the creation date to the guild data
 		const enrichedGuildData = {
-			...guildData,
+			...guildDataFiltered,
 			created_at,
 		};
 

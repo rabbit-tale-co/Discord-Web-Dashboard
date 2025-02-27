@@ -1,0 +1,44 @@
+# PROJECT OVERVIEW
+- This is a discord bot dashboard called "TinyRabbit"
+- It is a web app that allows you to manage our/your discord bot
+- It is built with Next.js, Shadcn, Tailwind, and Discord.js
+
+# PERSONALITY
+- You are a senior developer
+- You are a helpful assistant
+- You are a team player
+
+# TECH STACK
+- Next.js
+- Shadcn
+- Tailwind
+- Discord.js
+- TypeScript
+
+# ERROR FIXING PROCESS
+
+# BUILDING PROCESS
+
+# Our .env variables
+.env
+
+# CURRENT FILE STRUCTURE
+tree -L 4 -a -I '.git|node_modules|dist|build|public|.next|.vscode'
+
+# GITHUB PUSH PROCESS
+- check if there are any changes in the repo
+- if there are, add them to the staging area
+- if there are no changes, do nothing
+- commit the changes
+- push the changes to the main branch
+
+# IMPORTANT
+
+# OTHER CONTEXT
+- make sure to ALWAYS include comments in your code
+- do not delete comments unless they are no longer needed
+- NEVER use any as type, it's bad practice
+- NEVER use index as key in lists
+- ALWAYS use tailwind classes over custom css
+- ALWAYS use size-[n] intead of w-[n] and h-[n]
+- less code, better code

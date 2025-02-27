@@ -1,7 +1,5 @@
 "use client";
 
-import type { NavSection } from "@/types/navigation";
-
 import {
 	Sidebar,
 	SidebarContent,
@@ -9,46 +7,46 @@ import {
 	SidebarHeader,
 	SidebarRail,
 } from "@/components/navigation/sidebar";
-import { navigationConfig } from "../navigation/config";
 import { NavUser } from "./nav-user";
-
-import { NavMain, NavMainMobile } from "./nav-main";
+import { NavMain } from "./nav-main";
 import { ServerSwitcher } from "./server-switcher";
 import { useGuild, useGuilds } from "@/hooks/use-guilds";
 import { useParams } from "next/navigation";
-import { useAuth } from "@/app/authContext";
-import { Button } from "@/components/ui/button";
-import * as Icon from "@/components/icons";
-import { login } from "@/hooks/use-user";
-
-const plugins: NavSection = {
-	title: "Plugins",
-	iconName: "SolidLogo",
-	categories:
-		navigationConfig.find((item) => item.title === "Plugins")?.categories || [],
-};
+import { useAuth } from "@/context/authContext";
+import { useNavigationConfig } from "../navigation/config";
+import React from "react";
+import { useServerPlugins } from "@/context/plugins-context";
 
 export function DashboardSidebar({
 	...props
 }: React.ComponentProps<typeof Sidebar>) {
 	const { user } = useAuth();
 	const params = useParams();
-	const { guildData } = useGuild(params.id as string);
-	const { guilds, status } = useGuilds();
+	const guildId = params.id as string;
+	const { guildData } = useGuild(guildId);
+	const { guilds } = useGuilds();
 
-	// Don't render anything if we're loading or missing essential data
-	if (status === "loading") return null;
+	const { pluginsData, lastUpdated } = useServerPlugins();
+
+	const navigationConfig = useNavigationConfig(pluginsData);
+	const pluginsSection = React.useMemo(
+		() => navigationConfig.find((section) => section.title === "Plugins"),
+		[navigationConfig],
+	);
 
 	return (
 		<Sidebar {...props}>
 			<SidebarHeader>
-				<ServerSwitcher servers={guilds || []} />
+				<ServerSwitcher servers={guilds} />
 			</SidebarHeader>
-			<SidebarContent>
-				{guildData && (
-					<NavMain guildId={guildData.guild_details.id} section={plugins} />
+			<SidebarContent key={`content-${guildId}-${lastUpdated}`}>
+				{guildData && pluginsSection && (
+					<NavMain
+						key={`nav-${guildId}-${lastUpdated}`}
+						guildId={guildData.guild_details.id}
+						section={pluginsSection}
+					/>
 				)}
-				{/* <NavProjects projects={data.projects} /> */}
 			</SidebarContent>
 			<SidebarFooter>{user && <NavUser user={user} />}</SidebarFooter>
 			<SidebarRail />

@@ -41,8 +41,19 @@ export function ServerSwitcher({
 	const { isMobile } = useSidebar();
 	const params = useParams();
 	const [activeServer, setActiveServer] = React.useState<Server | null>(null);
+	const [isOpen, setIsOpen] = React.useState(false);
+	const isMounted = React.useRef(true);
 
 	React.useEffect(() => {
+		isMounted.current = true;
+		return () => {
+			isMounted.current = false;
+		};
+	}, []);
+
+	React.useEffect(() => {
+		if (!isMounted.current) return;
+
 		if (servers.length > 0) {
 			// Find server matching current URL param or default to first server
 			const currentServer =
@@ -58,7 +69,7 @@ export function ServerSwitcher({
 	return (
 		<SidebarMenu>
 			<SidebarMenuItem>
-				<DropdownMenu>
+				<DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
 					<DropdownMenuTrigger asChild>
 						<SidebarMenuButton
 							size="lg"
@@ -69,7 +80,7 @@ export function ServerSwitcher({
 									src={avatarUrl(
 										activeServer.id,
 										activeServer.icon || "",
-										128,
+										64,
 										false,
 									)}
 									alt={activeServer.name}
@@ -96,13 +107,19 @@ export function ServerSwitcher({
 						align="start"
 						side={isMobile ? "bottom" : "right"}
 						sideOffset={4}
+						forceMount
 					>
 						<DropdownMenuLabel className="text-xs text-muted-foreground">
 							Your Servers
 						</DropdownMenuLabel>
 						{servers.map((server, index) => (
 							<DropdownMenuItem key={server.id} asChild className="gap-2 p-2">
-								<Link href={`/dashboard/${server.id}`}>
+								<Link
+									href={`/dashboard/${server.id}`}
+									onClick={() => {
+										setIsOpen(false);
+									}}
+								>
 									<div className="flex size-6 items-center justify-center rounded-sm overflow-hidden">
 										<Image
 											src={avatarUrl(server.id, server.icon || "", 64, false)}
