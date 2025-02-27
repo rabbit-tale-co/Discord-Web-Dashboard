@@ -1,16 +1,17 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { Save } from "lucide-react";
 import type { Plugin } from "@/hooks/use-plugins";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 
-// Import our custom field components
+// Import naszych komponentów pól formularza
 import { ChannelField } from "./fields/channel-field";
 import { RoleField } from "./fields/role-field";
 import { TextField } from "./fields/text-field";
@@ -19,6 +20,8 @@ import { ArrayField } from "./fields/array-field";
 import { ColorField } from "./fields/color-field";
 import { MessageField } from "./fields/message-field";
 import { EmojiField } from "./fields/emoji-field";
+import { toast } from "sonner";
+import { deepEqual } from "@/lib/deep-equal";
 
 type PluginConfigFormProps = {
 	plugin: Plugin;
@@ -28,6 +31,8 @@ type PluginConfigFormProps = {
 	type: "basic" | "advanced";
 };
 
+const UNSAVED_KEY = (pluginId: string) => `unsaved-plugin-${pluginId}`;
+
 export function PluginConfigForm({
 	plugin,
 	guildId,
@@ -35,270 +40,298 @@ export function PluginConfigForm({
 	isSaving,
 	type,
 }: PluginConfigFormProps) {
-	const [formSchema, setFormSchema] = useState<z.ZodObject<any>>();
-	const [defaultValues, setDefaultValues] = useState<any>({});
-	const [fields, setFields] = useState<React.ReactNode[]>([]);
+	// Typ dla danych formularza
+	type FormValues = Record<string, unknown>;
 
-	// Dynamically create the form schema and fields based on plugin type
-	useEffect(() => {
-		const schemaFields: Record<string, any> = {};
-		const values: Record<string, any> = {};
+	const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+	const [isShaking, setIsShaking] = useState(false);
+	const router = useRouter();
+
+	// Refs do toastów i kontroli pierwszego renderu
+	const toastIdRef = useRef<string | number | undefined>(undefined);
+	const initialRenderRef = useRef(true);
+	const hasShownToastRef = useRef(false);
+	const prevPluginIdRef = useRef(plugin.id);
+	// Ref przechowujący początkowe (zapisane) wartości formularza – jako podstawa do porównania
+	const initialSavedValuesRef = useRef<Record<string, unknown>>({});
+
+	// Inicjalizacja stanu formularza
+	const [formState, setFormState] = useState<{
+		schema: z.ZodObject<z.ZodRawShape> | undefined;
+		defaultValues: Record<string, unknown>;
+		fields: React.ReactNode[];
+	}>(() => {
+		const schemaFields: Record<string, z.ZodTypeAny> = {};
+		const values: Record<string, unknown> = {};
 		const formFields: React.ReactNode[] = [];
 
-		// Always add the 'enabled' field to basic tab
-		// if (type === "basic") {
-		// 	schemaFields.enabled = z.boolean();
-		// 	values.enabled = plugin.enabled;
+		// Pobieramy wartości z pluginu
+		for (const key of Object.keys(plugin)) {
+			if (key !== "id" && key !== "name" && key !== "description") {
+				values[key] = plugin[key as keyof Plugin] ?? "";
+			}
+		}
 
-		// 	formFields.push(
-		// 		<ToggleField
-		// 			key="enabled"
-		// 			name="enabled"
-		// 			label="Status pluginu"
-		// 			description="Włącz lub wyłącz ten plugin"
-		// 		/>,
-		// 	);
-		// }
+		// Łączymy ewentualne niezapisane zmiany z localStorage
+		try {
+			const unsaved = localStorage.getItem(UNSAVED_KEY(plugin.id));
+			if (unsaved) {
+				const parsed = JSON.parse(unsaved);
+				Object.assign(values, parsed);
+			}
+		} catch (error) {
+			console.error("Błąd parsowania niezapisanych zmian:", error);
+		}
 
-		//TODO: for every input insert data from plugin config JSON
-		// Create different fields based on plugin ID
+		// Pola specyficzne dla plugin.id
 		switch (plugin.id) {
 			case "levels":
-				if (type === "basic") {
-					// Basic settings
-					schemaFields.channel_id = z.string().optional();
-					values.channel_id = plugin.channel_id;
-					formFields.push(
-						<ChannelField
-							key="channel_id"
-							name="channel_id"
-							label="Levels channel"
-							description="Channel to send level up notifications"
-							guildId={guildId}
-						/>,
-					);
-
-					schemaFields.reward_message = z.string();
-					values.reward_message = plugin.reward_message;
-					formFields.push(
-						<MessageField
-							key="reward_message"
-							name="reward_message"
-							label="Reward message"
-							description="Message sent when a user reaches a new level. You can use {level} as a placeholder."
-						/>,
-					);
-				} else {
-					// Advanced settings
-					schemaFields.reward_roles = z.array(
+				schemaFields.channel_id = z.string().optional();
+				values.channel_id = plugin.channel_id ?? "";
+				formFields.push(
+					<ChannelField
+						key="channel_id"
+						name="channel_id"
+						label="Levels channel"
+						description="Channel to send level up notifications"
+						guildId={guildId}
+					/>,
+				);
+				schemaFields.reward_message = z.string().optional().default("");
+				values.reward_message = plugin.reward_message ?? "";
+				formFields.push(
+					<MessageField
+						key="reward_message"
+						name="reward_message"
+						label="Reward message"
+						description="Message sent when a user reaches a new level. You can use {level} as a placeholder."
+					/>,
+				);
+				schemaFields.reward_roles = z
+					.array(
 						z.object({
-							level: z.number(),
+							level: z.coerce.number().default(0),
 							role_id: z.string(),
 						}),
-					);
-					values.reward_roles = plugin.reward_roles || [];
-					formFields.push(
-						<ArrayField
-							key="reward_roles"
-							name="reward_roles"
-							label="Roles for levels"
-							description="Roles awarded for reaching specific levels"
-							guildId={guildId}
-							arrayType="levelRoles"
-						/>,
-					);
-
-					schemaFields.boost_3x_roles = z.array(
-						z.object({
-							role_id: z.string(),
-						}),
-					);
-					values.boost_3x_roles = plugin.boost_3x_roles || [];
-					formFields.push(
-						<ArrayField
-							key="boost_3x_roles"
-							name="boost_3x_roles"
-							label="Roles with XP multiplier"
-							description="Roles that receive triple XP"
-							guildId={guildId}
-							arrayType="roles"
-						/>,
-					);
-				}
+					)
+					.default([]);
+				values.reward_roles = plugin.reward_roles ?? [];
+				formFields.push(
+					<ArrayField
+						key="reward_roles"
+						name="reward_roles"
+						label="Roles for levels"
+						description="Roles awarded for reaching specific levels"
+						guildId={guildId}
+						arrayType="levelRoles"
+					/>,
+				);
+				// Inny przykład pola tablicowego
+				schemaFields.boost_3x_roles = z.array(
+					z.object({
+						role_id: z.string(),
+					}),
+				);
+				values.boost_3x_roles = plugin.boost_3x_roles ?? [];
+				formFields.push(
+					<ArrayField
+						key="boost_3x_roles"
+						name="boost_3x_roles"
+						label="Roles with XP multiplier"
+						description="Roles that receive triple XP"
+						guildId={guildId}
+						arrayType="roles"
+					/>,
+				);
 				break;
-
 			case "welcome":
-				if (type === "basic") {
-					schemaFields.welcome_channel_id = z.string().optional();
-					values.welcome_channel_id = plugin.welcome_channel_id;
-					formFields.push(
-						<ChannelField
-							key="welcome_channel_id"
-							name="welcome_channel_id"
-							label="Welcome channel"
-							description="Channel to send welcome messages to new users"
-							guildId={guildId}
-						/>,
-					);
-
-					schemaFields.leave_channel_id = z.string().optional();
-					values.leave_channel_id = plugin.leave_channel_id;
-					formFields.push(
-						<ChannelField
-							key="leave_channel_id"
-							name="leave_channel_id"
-							label="Leave channel"
-							description="Channel to send leave messages to users"
-							guildId={guildId}
-						/>,
-					);
-
-					schemaFields.join_role_id = z.string().optional();
-					values.join_role_id = plugin.join_role_id;
-					formFields.push(
-						<RoleField
-							key="join_role_id"
-							name="join_role_id"
-							label="Welcome role"
-							description="Role awarded to new users"
-							guildId={guildId}
-						/>,
-					);
-				} else {
-					schemaFields.welcome_message = z.string();
-					values.welcome_message = plugin.welcome_message;
-					formFields.push(
-						<MessageField
-							key="welcome_message"
-							name="welcome_message"
-							label="Welcome message"
-							description="Custom welcome message. You can use {user}, {server_name} as placeholders."
-							multiline={true}
-						/>,
-					);
-
-					schemaFields.leave_message = z.string();
-					values.leave_message = plugin.leave_message;
-					formFields.push(
-						<MessageField
-							key="leave_message"
-							name="leave_message"
-							label="Leave message"
-							description="Custom leave message. You can use {username}, {server_name} as placeholders."
-							multiline={true}
-						/>,
-					);
-				}
+				schemaFields.welcome_message = z.string().optional().default("");
+				values.welcome_message = plugin.welcome_message ?? "";
+				formFields.push(
+					<MessageField
+						key="welcome_message"
+						name="welcome_message"
+						label="Welcome message"
+						description="Message sent when a user joins the server"
+					/>,
+				);
+				schemaFields.welcome_roles = z.array(z.string()).optional();
+				values.welcome_roles = plugin.welcome_roles ?? [];
+				formFields.push(
+					<ArrayField
+						key="welcome_roles"
+						name="welcome_roles"
+						label="Welcome roles"
+						description="Roles assigned to new members"
+						guildId={guildId}
+						arrayType="roles"
+					/>,
+				);
 				break;
-
-			case "starboard":
-				if (type === "basic") {
-					schemaFields.starboard_channel_id = z.string().optional();
-					values.starboard_channel_id = plugin.starboard_channel_id;
-					formFields.push(
-						<ChannelField
-							key="starboard_channel_id"
-							name="starboard_channel_id"
-							label="Starboard channel"
-							description="Channel to send starboard messages"
-							guildId={guildId}
-						/>,
-					);
-
-					schemaFields.starboard_emoji = z.string();
-					values.starboard_emoji = plugin.starboard_emoji;
-					formFields.push(
-						<EmojiField
-							key="starboard_emoji"
-							name="starboard_emoji"
-							label="Starboard emoji"
-							description="Emoji to use for starboard messages"
-							guildId={guildId}
-						/>,
-					);
-				} else {
-					schemaFields.starboard_message = z.string();
-					values.starboard_message = plugin.starboard_message;
-					formFields.push(
-						<MessageField
-							key="starboard_message"
-							name="starboard_message"
-							label="Starboard message"
-							description="Custom starboard message. You can use {user}, {message_id} as placeholders."
-							multiline={true}
-						/>,
-					);
-				}
-				break;
-			// Dodaj więcej przypadków dla innych pluginów
-
-			default:
-				// Dla nieznanych pluginów wyświetl ogólny formularz JSON
-				if (type === "advanced") {
-					schemaFields.config = z.string();
-					values.config = JSON.stringify(plugin, null, 2);
-					formFields.push(
-						<TextField
-							key="config"
-							name="config"
-							label="JSON configuration"
-							description="Edit the plugin configuration directly in JSON format"
-							multiline={true}
-						/>,
-					);
-				}
 		}
 
-		if (Object.keys(schemaFields).length > 0) {
-			setFormSchema(z.object(schemaFields));
-			setDefaultValues(values);
-			setFields(formFields);
-		}
-	}, [plugin, guildId, type]);
-
-	const form = useForm<any>({
-		resolver: formSchema ? zodResolver(formSchema) : undefined,
-		defaultValues,
+		return {
+			schema:
+				Object.keys(schemaFields).length > 0
+					? z.object(schemaFields)
+					: undefined,
+			defaultValues: values,
+			fields: formFields,
+		};
 	});
 
-	const onSubmit = async (data: any) => {
-		// Jeśli to zaawansowana edycja, możemy potrzebować przekształcić dane
-		let configToSave = data;
+	// Inicjujemy formularz
+	const form = useForm<FormValues>({
+		resolver: formState.schema ? zodResolver(formState.schema) : undefined,
+		defaultValues: formState.defaultValues,
+		shouldUnregister: false,
+	});
+
+	// Ustawienie początkowych wartości zapamiętanych w refie
+	useEffect(() => {
+		initialSavedValuesRef.current = formState.defaultValues;
+	}, [formState.defaultValues]);
+
+	// Zapis zmian do localStorage
+	useEffect(() => {
+		const subscription = form.watch((value) => {
+			localStorage.setItem(UNSAVED_KEY(plugin.id), JSON.stringify(value));
+		});
+		return () => subscription.unsubscribe();
+	}, [form, plugin.id]);
+
+	// Split the form watch and toast logic into separate effects
+	useEffect(() => {
+		const subscription = form.watch(() => {
+			if (initialRenderRef.current) {
+				initialRenderRef.current = false;
+				return;
+			}
+
+			const currentValues = form.getValues();
+			const isEqual = deepEqual(initialSavedValuesRef.current, currentValues);
+			setHasUnsavedChanges(!isEqual);
+		});
+
+		return () => subscription.unsubscribe();
+	}, [form]);
+
+	// Separate effect to handle toast visibility
+	useEffect(() => {
+		// Always dismiss toast when there are no unsaved changes
+		if (!hasUnsavedChanges) {
+			if (toastIdRef.current) {
+				toast.dismiss(toastIdRef.current);
+				toastIdRef.current = undefined;
+			}
+			hasShownToastRef.current = false;
+			return;
+		}
+
+		// Show toast only if we have unsaved changes and haven't shown it yet
+		if (!hasShownToastRef.current) {
+			hasShownToastRef.current = true;
+			toastIdRef.current = toast("You have unsaved changes", {
+				description:
+					"Your changes will be used until you save or reset the form.",
+				duration: Number.POSITIVE_INFINITY,
+				action: (
+					<Button
+						onClick={() => form.handleSubmit(onSubmit)()}
+						variant="default"
+						disabled={isSaving}
+						className="bg-green-600 hover:bg-green-700"
+					>
+						{isSaving ? "Saving..." : "Save changes"}
+					</Button>
+				),
+			});
+		}
+
+		return () => {
+			if (toastIdRef.current) {
+				toast.dismiss(toastIdRef.current);
+				toastIdRef.current = undefined;
+			}
+		};
+	}, [hasUnsavedChanges, isSaving, form.handleSubmit]);
+
+	// Reset formularza przy zmianie pluginu
+	useEffect(() => {
+		if (plugin.id !== prevPluginIdRef.current) {
+			initialRenderRef.current = true;
+			hasShownToastRef.current = false;
+			setHasUnsavedChanges(false);
+			prevPluginIdRef.current = plugin.id;
+			initialSavedValuesRef.current = formState.defaultValues;
+			const unsaved = localStorage.getItem(UNSAVED_KEY(plugin.id));
+			if (unsaved) {
+				form.reset(JSON.parse(unsaved));
+			} else {
+				form.reset(formState.defaultValues);
+			}
+		}
+	}, [plugin.id, form, formState.defaultValues]);
+
+	const onSubmit = async (data: FormValues) => {
+		let configToSave: Record<string, unknown> = data;
 
 		if (type === "advanced" && data.config && plugin.id === "default") {
 			try {
-				configToSave = JSON.parse(data.config);
+				configToSave = JSON.parse(data.config as string);
 			} catch (e) {
-				console.error("Invalid JSON", e);
+				console.error("Niepoprawny JSON", e);
 				return;
 			}
 		}
 
-		await onSave(configToSave);
+		await onSave(configToSave as Partial<Plugin>);
+		setHasUnsavedChanges(false);
+		hasShownToastRef.current = false;
+		localStorage.removeItem(UNSAVED_KEY(plugin.id));
+		if (toastIdRef.current) {
+			toast.dismiss(toastIdRef.current);
+			toastIdRef.current = undefined;
+		}
 	};
 
-	if (!formSchema || fields.length === 0) {
+	if (!formState.schema || formState.fields.length === 0) {
 		return (
 			<div className="text-center py-4">
 				<p className="text-muted-foreground">
-					No settings to configure in this section.
+					Brak ustawień do konfiguracji w tej sekcji.
 				</p>
 			</div>
 		);
 	}
 
 	return (
-		<Form {...form}>
-			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-				{fields}
+		<motion.div
+			animate={isShaking ? { x: [0, -10, 10, -10, 10, 0] } : {}}
+			transition={{ duration: 0.5 }}
+		>
+			<Form {...form}>
+				<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+					{formState.fields.map((field) => {
+						const fieldName = (field as React.ReactElement<{ name: string }>)
+							.props.name;
+						const isBasicField = [
+							"channel_id",
+							"reward_message",
+							"welcome_message",
+						].includes(fieldName);
 
-				{/* <div className="flex justify-end">
-					<Button type="submit" disabled={isSaving}>
-						{isSaving ? "Saving..." : "Save changes"}
-						{!isSaving && <Save className="size-5" />}
-					</Button>
-				</div> */}
-			</form>
-		</Form>
+						return (
+							<div
+								key={fieldName}
+								className={type === "basic" && !isBasicField ? "hidden" : ""}
+							>
+								{type === "advanced" && isBasicField ? null : field}
+							</div>
+						);
+					})}
+				</form>
+			</Form>
+		</motion.div>
 	);
 }

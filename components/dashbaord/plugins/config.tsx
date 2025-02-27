@@ -28,6 +28,7 @@ export default function PluginConfig({
 	const pluginId = params.pluginId as string;
 	const { pluginsData, refetchPlugins } = useServerPlugins();
 	const [isSaving, setIsSaving] = useState(false);
+	const [currentTab, setCurrentTab] = useState("basic");
 
 	const handleSave = async (updatedConfig: Partial<Plugin>) => {
 		if (!plugin) return;
@@ -107,31 +108,23 @@ export default function PluginConfig({
 				<Separator />
 
 				<CardContent className="pt-6">
-					<Tabs defaultValue="basic" className="w-full">
+					<Tabs
+						defaultValue="basic"
+						className="w-full"
+						onValueChange={setCurrentTab}
+					>
 						<TabsList className="mb-4">
 							<TabsTrigger value="basic">Basic</TabsTrigger>
 							<TabsTrigger value="advanced">Advanced</TabsTrigger>
 						</TabsList>
 
-						<TabsContent value="basic" className="space-y-4">
-							<PluginConfigForm
-								plugin={plugin}
-								guildId={guildId}
-								onSave={handleSave}
-								isSaving={isSaving}
-								type="basic"
-							/>
-						</TabsContent>
-
-						<TabsContent value="advanced" className="space-y-4">
-							<PluginConfigForm
-								plugin={plugin}
-								guildId={guildId}
-								onSave={handleSave}
-								isSaving={isSaving}
-								type="advanced"
-							/>
-						</TabsContent>
+						<PluginConfigForm
+							plugin={plugin}
+							guildId={guildId}
+							onSave={handleSave}
+							isSaving={isSaving}
+							type={currentTab as "basic" | "advanced"}
+						/>
 					</Tabs>
 				</CardContent>
 			</Card>

@@ -161,15 +161,30 @@ export function ArrayField({
 											render={({ field }) => (
 												<FormItem>
 													<FormLabel>Level</FormLabel>
-													<Input
-														type="number"
-														{...field}
-														onChange={(e) =>
-															field.onChange(
-																Number.parseInt(e.target.value, 10),
-															)
-														}
-													/>
+													<FormControl>
+														<Input
+															type="number"
+															{...field}
+															value={
+																field.value === "" ? "" : Number(field.value)
+															}
+															onChange={(e) => {
+																const value =
+																	e.target.value === ""
+																		? ""
+																		: Number(e.target.value);
+																if (!isNaN(value)) {
+																	field.onChange(value);
+																}
+															}}
+															onKeyPress={(e) => {
+																if (!/[\d\b.]/.test(e.key)) {
+																	e.preventDefault();
+																}
+															}}
+														/>
+													</FormControl>
+													<FormMessage />
 												</FormItem>
 											)}
 										/>

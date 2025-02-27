@@ -114,7 +114,7 @@ export default function RootLayout({
 						</SidebarProvider>
 					</AuthProvider>
 				</Suspense>
-				<Toaster position="top-center" richColors />
+				<Toaster position="bottom-center" richColors />
 				<Analytics />
 				<SpeedInsights />
 			</body>
