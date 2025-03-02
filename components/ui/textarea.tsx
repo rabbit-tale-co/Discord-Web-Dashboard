@@ -95,7 +95,65 @@ const serializeToHtml = (nodes: SlateNode[]): string => {
 								? "bg-green-100 text-green-800 border border-green-300"
 								: "bg-purple-100 text-purple-800 border border-purple-300";
 
-					return `<span class="${mentionClass} rounded-md px-1 py-0.5 text-md select-all" data-slate-leaf="true" data-slate-inline="true" data-slate-void="true" contenteditable="false" data-type="mention" data-mention-type="${element.mentionType}"><span data-slate-string="true">${element.value}</span></span>`;
+					// Generate a human-readable version for display in HTML
+					let displayText = element.value;
+
+					if (
+						element.mentionType === "role" &&
+						displayText.startsWith("<@") &&
+						displayText.endsWith(">")
+					) {
+						const roleId = displayText.substring(2, displayText.length - 1);
+						displayText = "@role";
+
+						if (typeof window !== "undefined") {
+							try {
+								const typedWindow = window as WindowWithGuildData;
+								if (typedWindow.__guildData?.roles) {
+									const role = typedWindow.__guildData.roles.find(
+										(r) => r.id === roleId,
+									);
+									if (role) {
+										displayText = `@${role.name}`;
+									}
+								}
+							} catch (e) {
+								console.error(
+									"Error getting role name during serialization:",
+									e,
+								);
+							}
+						}
+					} else if (
+						element.mentionType === "channel" &&
+						displayText.startsWith("<#") &&
+						displayText.endsWith(">")
+					) {
+						const channelId = displayText.substring(2, displayText.length - 1);
+						displayText = "#channel";
+
+						if (typeof window !== "undefined") {
+							try {
+								const typedWindow = window as WindowWithGuildData;
+								if (typedWindow.__guildData?.channels) {
+									const channel = typedWindow.__guildData.channels.find(
+										(c) => c.id === channelId,
+									);
+									if (channel) {
+										displayText = `#${channel.name}`;
+									}
+								}
+							} catch (e) {
+								console.error(
+									"Error getting channel name during serialization:",
+									e,
+								);
+							}
+						}
+					}
+
+					// Use the actual value (with IDs) as a data attribute, display the friendly name
+					return `<span class="${mentionClass} rounded-md px-1 py-0.5 text-md select-all" data-slate-leaf="true" data-slate-inline="true" data-slate-void="true" contenteditable="false" data-type="mention" data-mention-type="${element.mentionType}" data-value="${element.value}"><span data-slate-string="true">${displayText}</span></span>`;
 				}
 
 				if (node.type === "paragraph") {
@@ -174,7 +232,6 @@ const deserializeHtml = (html: string): ParagraphElement[] => {
 
 			// Handle mention elements
 			if (element.getAttribute("data-type") === "mention") {
-				const content = element.textContent || "";
 				const mentionTypeAttr = element.getAttribute("data-mention-type");
 				let mentionType: "variable" | "role" | "channel" = "variable";
 
@@ -184,11 +241,15 @@ const deserializeHtml = (html: string): ParagraphElement[] => {
 					mentionType = "channel";
 				}
 
+				// Get the value from data-value attribute if available, otherwise fallback to content
+				const value =
+					element.getAttribute("data-value") || element.textContent || "";
+
 				return [
 					{
 						type: "mention",
 						mentionType,
-						value: content,
+						value,
 						children: [{ text: "" }],
 					},
 				];
@@ -228,8 +289,10 @@ const Element = ({
 	element: CustomElement;
 }) => {
 	if (element.type === "mention") {
-		// Extract the actual name/ID from the mention format
-		let displayText = element.value;
+		// Store the actual ID/value for form submission
+		const originalValue = element.value;
+		// Display text will be user-friendly
+		let displayText = originalValue;
 		let mentionStyle = "bg-discord-foreground text-discord-bg";
 
 		if (element.mentionType === "role") {
@@ -297,6 +360,7 @@ const Element = ({
 				contentEditable={false}
 				data-type="mention"
 				data-mention-type={element.mentionType}
+				data-value={originalValue}
 			>
 				<span data-slate-string="true">{displayText}</span>
 				{children}
