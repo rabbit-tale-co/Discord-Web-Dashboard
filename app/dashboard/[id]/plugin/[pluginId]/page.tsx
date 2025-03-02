@@ -12,9 +12,8 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import type { Plugin } from "@/hooks/use-plugins";
@@ -24,10 +23,11 @@ export default function PluginPage() {
 	const params = useParams();
 	const guildId = params.id as string;
 	const pluginId = params.pluginId as string; // Prawidłowe pobieranie ID pluginu
-	const { pluginsData, refetchPlugins } = useServerPlugins();
+	const { pluginsData, refetchPlugins, lastUpdated } = useServerPlugins();
 	const [plugin, setPlugin] = useState<Plugin | null>(null);
-	const [isEnabled, setIsEnabled] = useState(false);
-	const [isSaving, setIsSaving] = useState(false);
+	const [status, setStatus] = useState<"loading" | "error" | "success">(
+		"loading",
+	);
 
 	// console.log(plugin);
 
@@ -37,7 +37,7 @@ export default function PluginPage() {
 			const foundPlugin = pluginsData.find((p) => p.id === pluginId);
 			if (foundPlugin) {
 				setPlugin(foundPlugin);
-				setIsEnabled(foundPlugin.enabled);
+				setStatus(foundPlugin.enabled ? "success" : "error");
 			}
 		}
 	}, [pluginsData, pluginId]);
@@ -45,38 +45,87 @@ export default function PluginPage() {
 	const handleSave = async () => {
 		if (!plugin) return;
 
-		setIsSaving(true);
+		// Toggle the plugin status locally for immediate UI feedback
+		const newEnabledState = !plugin.enabled;
+		setPlugin({ ...plugin, enabled: newEnabledState });
+		setStatus("loading");
+
 		try {
-			// Wysyłanie żądania do API w celu aktualizacji ustawień pluginu
-			const response = await fetch(`/api/plugins/${pluginId}`, {
-				method: "PUT",
+			// Determine the correct endpoint based on the NEW enabled state
+			const endpoint = newEnabledState
+				? "/api/plugins/enable"
+				: "/api/plugins/disable";
+
+			console.log(
+				`Using ${endpoint} endpoint based on switch state: ${newEnabledState ? "enabled" : "disabled"}`,
+			);
+
+			// Get bot_id from environment variables
+			const bot_id = process.env.NEXT_PUBLIC_BOT_ID;
+			if (!bot_id) {
+				throw new Error("Bot ID not configured in environment variables");
+			}
+
+			// Log the request details
+			console.log("Sending request to:", endpoint);
+			console.log("Request payload:", {
+				bot_id: "[HIDDEN]",
+				guild_id: guildId,
+				plugin_name: pluginId,
+			});
+
+			// Send request to the appropriate API endpoint
+			// Using parameter names that match the backend API expectations
+			const response = await fetch(endpoint, {
+				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					guildId,
-					enabled: isEnabled,
-					// Dodaj inne ustawienia, które mogą być zmienione
+					bot_id,
+					guild_id: guildId,
+					plugin_name: pluginId,
 				}),
 			});
 
+			console.log("Response status:", response.status, response.statusText);
+
 			if (!response.ok) {
-				throw new Error("Failed to update plugin settings");
+				const errorText = await response.text();
+				console.error("API Error:", {
+					status: response.status,
+					statusText: response.statusText,
+					body: errorText,
+				});
+				throw new Error(
+					`Failed to ${newEnabledState ? "enable" : "disable"} plugin: ${errorText}`,
+				);
 			}
 
-			// Odśwież dane pluginów po zapisaniu
+			const responseData = await response.json();
+			console.log("API Response data:", responseData);
+
+			// Only call refetchPlugins once
 			await refetchPlugins();
 
-			toast.success("Ustawienia zapisane", {
-				description: "Ustawienia pluginu zostały pomyślnie zaktualizowane.",
+			toast.success(newEnabledState ? "Plugin enabled" : "Plugin disabled", {
+				description: `The plugin was successfully ${newEnabledState ? "enabled" : "disabled"}.`,
 			});
+
+			// Set status based on the new state
+			setStatus(newEnabledState ? "success" : "error");
 		} catch (error) {
-			console.error("Error saving plugin settings:", error);
-			toast.error("Nie udało się zapisać ustawień pluginu.", {
-				description: "Spróbuj ponownie później.",
-			});
-		} finally {
-			setIsSaving(false);
+			console.error("Error toggling plugin state:", error);
+			toast.error(
+				`Failed to ${newEnabledState ? "enable" : "disable"} plugin`,
+				{
+					description: "Please try again later or contact support.",
+				},
+			);
+
+			// Revert the switch state in case of error
+			setPlugin({ ...plugin, enabled: !newEnabledState });
+			setStatus(!newEnabledState ? "success" : "error");
 		}
 	};
 
@@ -89,15 +138,14 @@ export default function PluginPage() {
 							Dashboard
 						</h2>
 					</div>
-					<Button
+					{/* <Button
 						onClick={handleSave}
 						disabled={isSaving}
 						size={"lg"}
 						type={"submit"}
 					>
 						{isSaving ? "Saving..." : "Save changes"}
-						{/* {!isSaving && <Save className="size-5.5" />} */}
-					</Button>
+					</Button> */}
 				</div>
 				<div className="mb-6">
 					<Link
@@ -110,16 +158,28 @@ export default function PluginPage() {
 				</div>
 
 				{plugin ? (
-					<React.Fragment>
+					<React.Fragment
+						key={`plugin-${plugin.id}-${plugin.enabled}-${lastUpdated}`}
+					>
 						<Card className="py-6">
 							<CardHeader>
 								<div className="flex items-center justify-between">
 									<CardTitle className="text-2xl">
 										{String(plugin.name || plugin.id)}
 									</CardTitle>
-									<Badge variant={isEnabled ? "default" : "destructive"}>
-										{isEnabled ? "Active" : "Inactive"}
-									</Badge>
+									{status === "loading" ? (
+										<Badge variant="outline">Pending</Badge>
+									) : (
+										<Badge
+											variant={
+												plugin.enabled && status === "success"
+													? "default"
+													: "destructive"
+											}
+										>
+											{plugin.enabled ? "Active" : "Inactive"}
+										</Badge>
+									)}
 								</div>
 							</CardHeader>
 
@@ -132,22 +192,25 @@ export default function PluginPage() {
 												Enable or disable this plugin
 											</p>
 										</div>
-										<Switch
-											checked={isEnabled}
-											onCheckedChange={setIsEnabled}
-										/>
+										<div className="flex items-center gap-2">
+											<Switch
+												checked={plugin.enabled}
+												onCheckedChange={() => {
+													handleSave();
+												}}
+												className={`${status === "loading" ? "cursor-not-allowed" : "cursor-pointer"}`}
+												disabled={status === "loading"}
+											/>
+										</div>
 									</div>
 
 									{/* Tutaj można dodać więcej ustawień specyficznych dla danego pluginu */}
 								</div>
 							</CardContent>
 
-							{/* <CardFooter className="flex justify-end">
-									<Button onClick={handleSave} disabled={isSaving}>
-										{isSaving ? "Saving..." : "Save changes"}
-										{!isSaving && <Save className="size-5" />}
-									</Button>
-								</CardFooter> */}
+							<CardFooter className="flex justify-end">
+								{/* Save button removed since we now save automatically on toggle */}
+							</CardFooter>
 						</Card>
 
 						<Config plugin={plugin} guildId={guildId} />

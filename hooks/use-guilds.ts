@@ -36,6 +36,8 @@ interface GuildDetails {
 }
 
 export interface GuildData {
+	id: string;
+	name: string;
 	category_count: number;
 	text_channel_count: number;
 	voice_channel_count: number;
@@ -135,6 +137,8 @@ export function useGuild(id: string) {
 				})
 				.then((data) => {
 					const transformedData = {
+						id: data.guild_details.id,
+						name: data.guild_details.name,
 						category_count: data.category_count || 0,
 						text_channel_count: data.text_channel_count,
 						voice_channel_count: data.voice_channel_count,

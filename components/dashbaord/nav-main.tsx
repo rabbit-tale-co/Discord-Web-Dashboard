@@ -36,7 +36,7 @@ export function NavMain({
 	section: NavSection;
 	guildId: string;
 }) {
-	const { pluginsData } = useServerPlugins();
+	const { pluginsData, lastUpdated } = useServerPlugins();
 
 	const enabledPlugins = useMemo(() => {
 		return pluginsData.filter((plugin) => plugin.enabled);
@@ -47,7 +47,7 @@ export function NavMain({
 	//const SectionIcon = section.iconName ? resolveIcon(section.iconName) : null;
 
 	return (
-		<SidebarGroup key={`plugins-${guildId}`}>
+		<SidebarGroup key={`plugins-${guildId}-${lastUpdated}`}>
 			{/* HOME */}
 			<SidebarMenu>
 				<Collapsible
@@ -78,7 +78,7 @@ export function NavMain({
 			</SidebarMenu>
 
 			{/* PLUGINS */}
-			<SidebarMenu>
+			<SidebarMenu key={`plugins-menu-${lastUpdated}`}>
 				<Collapsible
 					asChild
 					defaultOpen
@@ -106,7 +106,7 @@ export function NavMain({
 						<CollapsibleContent className="ml-2.5">
 							<SidebarMenuSub>
 								{section.categories.map((category) => (
-									<Collapsible key={category.title}>
+									<Collapsible key={`${category.title}-${lastUpdated}`}>
 										<CollapsibleTrigger asChild className="relative">
 											<SidebarMenuButton>
 												<ChevronRight className="transition-transform duration-150" />
@@ -123,26 +123,29 @@ export function NavMain({
 										</CollapsibleTrigger>
 										<CollapsibleContent className="ml-2.5">
 											<SidebarMenuSub>
-												{category.items.map((item) => (
-													<SidebarMenuItem key={item.title}>
-														<SidebarMenuButton asChild>
-															<Link
-																href={`/dashboard/${guildId}/plugin/${item.url}`}
-															>
-																{item.title}
-																<span
-																	className={`absolute -right-5 size-1.5 rounded-full ${
-																		enabledPlugins.some(
-																			(p) => p.id === item.url,
-																		)
-																			? "bg-green-500"
-																			: "bg-red-500"
-																	}`}
-																/>
-															</Link>
-														</SidebarMenuButton>
-													</SidebarMenuItem>
-												))}
+												{category.items.map((item) => {
+													const isEnabled = enabledPlugins.some(
+														(p) => p.id === item.url,
+													);
+													return (
+														<SidebarMenuItem
+															key={`${item.title}-${isEnabled}-${lastUpdated}`}
+														>
+															<SidebarMenuButton asChild>
+																<Link
+																	href={`/dashboard/${guildId}/plugin/${item.url}`}
+																>
+																	{item.title}
+																	<span
+																		className={`absolute -right-5 size-1.5 rounded-full ${
+																			isEnabled ? "bg-green-500" : "bg-red-500"
+																		}`}
+																	/>
+																</Link>
+															</SidebarMenuButton>
+														</SidebarMenuItem>
+													);
+												})}
 											</SidebarMenuSub>
 										</CollapsibleContent>
 									</Collapsible>
@@ -157,35 +160,64 @@ export function NavMain({
 }
 
 export function NavMainMobile() {
+	const { pluginsData, lastUpdated } = useServerPlugins();
+
+	const enabledPlugins = useMemo(() => {
+		return pluginsData.filter((plugin) => plugin.enabled);
+	}, [pluginsData]);
+
 	return (
-		<SidebarGroup>
+		<SidebarGroup key={`mobile-nav-${lastUpdated}`}>
 			<SidebarMenu>
 				{navigationConfig.map((section) => (
 					<Collapsible
-						key={section.title}
+						key={`${section.title}-${lastUpdated}`}
 						className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
 					>
 						<CollapsibleTrigger asChild>
 							<SidebarMenuButton className="w-full">
 								<ChevronRight className="transition-transform duration-150" />
 								{section.title}
+								{section.title === "Plugins" && (
+									<Badge variant={"outline"} className="ml-auto">
+										{enabledPlugins.length} /{" "}
+										{section.categories.reduce(
+											(acc, category) => acc + category.items.length,
+											0,
+										)}
+									</Badge>
+								)}
 							</SidebarMenuButton>
 						</CollapsibleTrigger>
 						<CollapsibleContent>
 							<SidebarMenuSub>
 								{section.categories.map((category) => (
-									<React.Fragment key={category.title}>
-										{category.items.map((item) => (
-											<SidebarMenuItem key={item.title}>
-												<SidebarMenuButton asChild>
-													<Link href={`plugin/${item.url}` || ""}>
-														<span className="flex flex-col">
-															<span>{item.title}</span>
-														</span>
-													</Link>
-												</SidebarMenuButton>
-											</SidebarMenuItem>
-										))}
+									<React.Fragment key={`${category.title}-${lastUpdated}`}>
+										{category.items.map((item) => {
+											const isEnabled = enabledPlugins.some(
+												(p) => p.id === item.url,
+											);
+											return (
+												<SidebarMenuItem
+													key={`${item.title}-${isEnabled}-${lastUpdated}`}
+												>
+													<SidebarMenuButton asChild>
+														<Link href={`plugin/${item.url}` || ""}>
+															<span className="flex flex-col">
+																<span>{item.title}</span>
+																{section.title === "Plugins" && (
+																	<span
+																		className={`absolute -right-5 size-1.5 rounded-full ${
+																			isEnabled ? "bg-green-500" : "bg-red-500"
+																		}`}
+																	/>
+																)}
+															</span>
+														</Link>
+													</SidebarMenuButton>
+												</SidebarMenuItem>
+											);
+										})}
 									</React.Fragment>
 								))}
 							</SidebarMenuSub>

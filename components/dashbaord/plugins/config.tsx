@@ -11,11 +11,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, RotateCw } from "lucide-react";
-import Link from "next/link";
-import { toast } from "sonner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RotateCw } from "lucide-react";
 import type { Plugin } from "@/hooks/use-plugins";
 import { PluginConfigForm } from "@/components/plugins/plugin-config-form";
 import { Separator } from "@/components/ui/separator";
@@ -24,48 +21,7 @@ export default function PluginConfig({
 	plugin,
 	guildId,
 }: { plugin: Plugin; guildId: string }) {
-	const params = useParams();
-	const pluginId = params.pluginId as string;
-	const { pluginsData, refetchPlugins } = useServerPlugins();
-	const [isSaving, setIsSaving] = useState(false);
 	const [currentTab, setCurrentTab] = useState("basic");
-
-	const handleSave = async (updatedConfig: Partial<Plugin>) => {
-		if (!plugin) return;
-
-		setIsSaving(true);
-		try {
-			// Wysyłanie żądania do API w celu aktualizacji ustawień pluginu
-			const response = await fetch(`/api/plugins/${pluginId}`, {
-				method: "PUT",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					guildId,
-					...updatedConfig,
-				}),
-			});
-
-			if (!response.ok) {
-				throw new Error("Failed to update plugin settings");
-			}
-
-			// Odśwież dane pluginów po zapisaniu
-			await refetchPlugins();
-
-			toast.success("Konfiguracja zapisana", {
-				description: "Ustawienia pluginu zostały pomyślnie zaktualizowane.",
-			});
-		} catch (error) {
-			console.error("Error saving plugin settings:", error);
-			toast.error("Nie udało się zapisać konfiguracji pluginu.", {
-				description: "Spróbuj ponownie później.",
-			});
-		} finally {
-			setIsSaving(false);
-		}
-	};
 
 	if (!plugin) {
 		return (
@@ -121,8 +77,6 @@ export default function PluginConfig({
 						<PluginConfigForm
 							plugin={plugin}
 							guildId={guildId}
-							onSave={handleSave}
-							isSaving={isSaving}
 							type={currentTab as "basic" | "advanced"}
 						/>
 					</Tabs>

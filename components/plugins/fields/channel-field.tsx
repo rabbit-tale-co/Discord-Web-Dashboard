@@ -112,7 +112,7 @@ export function ChannelField({
 									variant="outline"
 									role="combobox"
 									className={cn(
-										"w-full justify-between rounded-md",
+										"w-full justify-between rounded-md text-primary",
 										!field.value && "text-muted-foreground",
 									)}
 								>

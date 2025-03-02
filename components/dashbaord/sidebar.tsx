@@ -39,7 +39,7 @@ export function DashboardSidebar({
 			<SidebarHeader>
 				<ServerSwitcher servers={guilds} />
 			</SidebarHeader>
-			<SidebarContent key={`content-${guildId}-${lastUpdated}`}>
+			<SidebarContent>
 				{guildData && pluginsSection && (
 					<NavMain
 						key={`nav-${guildId}-${lastUpdated}`}

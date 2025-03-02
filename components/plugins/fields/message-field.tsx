@@ -37,23 +37,134 @@ import { ReactEditor } from "slate-react";
 
 const SUGGESTIONS = [
 	{
+		id: "user",
+		name: "User",
+		description: "User mention",
+		example: "@User",
+		category: "user",
+	},
+	{
+		id: "username",
+		name: "Username",
+		description: "User's name",
+		example: "User",
+		category: "user",
+	},
+	{
+		id: "display_name",
+		name: "Display Name",
+		description: "User's display name",
+		example: "John Doe",
+		category: "user",
+	},
+	{
+		id: "avatar",
+		name: "Avatar",
+		description: "User's avatar",
+		example: "https://example.com/avatar.png",
+		category: "user",
+	},
+	{
+		id: "server_name",
+		name: "Server Name",
+		description: "Server's name",
+		example: "Server",
+		category: "server",
+	},
+	{
+		id: "server_image",
+		name: "Server Image",
+		description: "Server's image",
+		example: "https://example.com/server_image.png",
+		category: "server",
+	},
+	{
+		id: "server_id",
+		name: "server Id",
+		description: "Server's id",
+		example: "1234567890",
+		category: "server",
+	},
+	{
 		id: "level",
 		name: "level",
 		description: "User's current level",
 		example: "5",
+		category: "level",
 	},
 	{
-		id: "user",
-		name: "user",
-		description: "User mention",
-		example: "@User",
+		id: "ticket_id",
+		name: "ticket Id",
+		description: "Ticket id",
+		example: "10",
+		category: "tickets",
 	},
 	{
-		id: "username",
-		name: "username",
-		description: "User's name",
-		example: "John",
+		id: "opened_by",
+		name: "Opened By",
+		description: "User who opened the ticket",
+		example: "@user",
+		category: "tickets",
 	},
+	{
+		id: "opened_time",
+		name: "Opened At",
+		description: "Date and time the ticket was opened",
+		example: "2021-01-01 12:00:00",
+		category: "tickets",
+	},
+	{
+		id: "closed_by",
+		name: "Closed By",
+		description: "User who closed the ticket",
+		example: "@user",
+		category: "tickets",
+	},
+	{
+		id: "closed_time",
+		name: "Closed At",
+		description: "Date and time the ticket was closed",
+		example: "2021-01-01 12:00:00",
+		category: "tickets",
+	},
+	{
+		id: "reason",
+		name: "Closed Reason",
+		description: "Reason the ticket was closed",
+		example: "Spam",
+		category: "tickets",
+	},
+	{
+		id: "channel_id",
+		name: "Channel Id",
+		description: "Channel id",
+		example: "1234567890",
+		category: "general",
+	},
+	{
+		id: "claimed_by",
+		name: "Claimed By",
+		description: "User who claimed the ticket",
+		example: "@user",
+		category: "tickets",
+	},
+	{
+		id: "category",
+		name: "Category",
+		description: "Category of the ticket",
+		example: "Bug Report",
+		category: "tickets",
+	},
+];
+
+// Define the categories and their display order
+const CATEGORIES = [
+	{ id: "general", name: "General", icon: "🔹" },
+	{ id: "user", name: "User", icon: "👤" },
+	{ id: "server", name: "Server", icon: "🖥️" },
+	{ id: "tickets", name: "Tickets", icon: "🎫" },
+	{ id: "music", name: "Music", icon: "🎵" },
+	{ id: "level", name: "Level", icon: "🔝" },
 ];
 
 type MentionType = "variable" | "role" | "channel";
@@ -61,17 +172,6 @@ type MentionType = "variable" | "role" | "channel";
 interface MentionAnchor {
 	x: number;
 	y: number;
-}
-
-interface Role {
-	id: string;
-	name: string;
-	color?: number;
-}
-
-interface Channel {
-	id: string;
-	name: string;
 }
 
 // Interface for the window with guild data
@@ -158,8 +258,8 @@ export function MessageField({
 		}) => {
 			// Save the position for popover
 			setMentionAnchor({
-				x: data.domRect.left,
-				y: data.domRect.bottom,
+				x: data.domRect.left + 20,
+				y: data.domRect.bottom + 6,
 			});
 
 			setMentionType(data.type);
@@ -505,33 +605,61 @@ export function MessageField({
 																	</div>
 																</CommandItem>
 															))}
-													{mentionType === "variable" &&
-														SUGGESTIONS.map((item) => (
-															<CommandItem
-																key={item.id}
-																value={item.name}
-																onSelect={() => {
-																	if (!savedRangeRef.current) return;
-																	insertMention(
-																		mentionType,
-																		item,
-																		savedRangeRef.current,
-																	);
-																}}
-															>
-																<div className="flex flex-col">
-																	<span className="font-medium">
-																		{item.name}
-																	</span>
-																	{item.description && (
-																		<span className="text-sm text-muted-foreground">
-																			{item.description}
-																			{item.example && ` (np. ${item.example})`}
-																		</span>
-																	)}
-																</div>
-															</CommandItem>
-														))}
+													{mentionType === "variable" && (
+														<>
+															{CATEGORIES.map((category) => {
+																// Filter suggestions for this category
+																const categoryItems = SUGGESTIONS.filter(
+																	(item) =>
+																		item.category === category.id &&
+																		item.name
+																			.toLowerCase()
+																			.includes(searchValue.toLowerCase()),
+																);
+
+																// Only render category if it has matching items
+																if (categoryItems.length === 0) return null;
+
+																return (
+																	<React.Fragment key={category.id}>
+																		<div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">
+																			<span className="mr-2">
+																				{category.icon}
+																			</span>
+																			{category.name}
+																		</div>
+																		{categoryItems.map((item) => (
+																			<CommandItem
+																				key={item.id}
+																				value={item.name}
+																				onSelect={() => {
+																					if (!savedRangeRef.current) return;
+																					insertMention(
+																						mentionType,
+																						item,
+																						savedRangeRef.current,
+																					);
+																				}}
+																			>
+																				<div className="flex flex-col">
+																					<span className="font-medium">
+																						{item.name}
+																					</span>
+																					{item.description && (
+																						<span className="text-sm text-muted-foreground">
+																							{item.description}
+																							{item.example &&
+																								` (e.g. ${item.example})`}
+																						</span>
+																					)}
+																				</div>
+																			</CommandItem>
+																		))}
+																	</React.Fragment>
+																);
+															})}
+														</>
+													)}
 												</CommandGroup>
 											</CommandList>
 										</Command>

@@ -10,6 +10,15 @@ export interface Plugin {
 	[key: string]: string | boolean | number | Record<string, unknown>;
 }
 
+// Helper function to safely extract guild ID from potentially different GuildData structures
+function getGuildId(guildData: { guild_details?: { id: string }; id?: string }):
+	| string
+	| undefined {
+	if (!guildData) return undefined;
+	// Handle both possible structures
+	return guildData.guild_details?.id || guildData.id;
+}
+
 async function getPluginsFromAPI(guildId: string): Promise<Plugin[]> {
 	try {
 		const bot_id = process.env.NEXT_PUBLIC_BOT_ID;
@@ -36,36 +45,38 @@ async function getPluginsFromAPI(guildId: string): Promise<Plugin[]> {
 }
 
 export default function usePlugins(guildData: GuildData) {
+	const guild_id = getGuildId(guildData);
+
 	const [plugins, setPlugins] = useState<Plugin[]>(() => {
-		const cached = getCachedData<Plugin[]>(
-			`plugins-${guildData?.guild_details.id}`,
-		);
+		const cached = getCachedData<Plugin[]>(`plugins-${guild_id}`);
 		return cached?.data || [];
 	});
 	const [status, setStatus] = useState<"loading" | "error" | "success">(() =>
-		getCachedData(`plugins-${guildData?.guild_details.id}`)
-			? "success"
-			: "loading",
+		getCachedData(`plugins-${guild_id}`) ? "success" : "loading",
 	);
 	const [error, setError] = useState<Error | null>(null);
 
 	const refetchPlugins = useCallback(async () => {
-		const guild_id = guildData?.guild_details.id;
-		if (!guild_id) return;
+		if (!guild_id) return null;
 
 		setStatus("loading");
 		try {
+			// Clear cache before refetching to ensure we get fresh data
+			localStorage.removeItem(`cache-plugins-${guild_id}`);
+
 			const data = await getPluginsFromAPI(guild_id);
+
 			setPlugins(data);
 			setStatus("success");
+			return data; // Return data for consumers
 		} catch (err) {
 			setError(err as Error);
 			setStatus("error");
+			return null;
 		}
-	}, [guildData?.guild_details.id]);
+	}, [guild_id]);
 
 	useEffect(() => {
-		const guild_id = guildData?.guild_details.id;
 		if (!guild_id) return;
 
 		const cached = getCachedData<Plugin[]>(`plugins-${guild_id}`);
@@ -76,7 +87,7 @@ export default function usePlugins(guildData: GuildData) {
 		} else {
 			refetchPlugins();
 		}
-	}, [guildData?.guild_details.id, refetchPlugins]);
+	}, [guild_id, refetchPlugins]);
 
 	return { plugins, status, error, refetchPlugins };
 }

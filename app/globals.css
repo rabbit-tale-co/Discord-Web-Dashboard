@@ -165,6 +165,10 @@
 
   --color-discord-bg: var(--color-discord-blue-500);
   --color-discord-foreground: var(--color-discord-blue-50);
+  --color-discord-success: var(--color-discord-green-500);
+  --color-discord-success-foreground: var(--color-discord-green-50);
+  --color-discord-error: var(--color-discord-red-500);
+  --color-discord-error-foreground: var(--color-discord-red-50);
 }
 
 @layer base {

@@ -1,4 +1,4 @@
-type EventCallback = (...args: any[]) => void;
+type EventCallback = (...args: unknown[]) => void;
 
 class EventEmitter {
 	private events: Record<string, EventCallback[]> = {};
@@ -15,7 +15,7 @@ class EventEmitter {
 		this.events[event] = this.events[event].filter((cb) => cb !== callback);
 	}
 
-	emit(event: string, ...args: any[]) {
+	emit(event: string, ...args: unknown[]) {
 		if (!this.events[event]) return;
 		for (const callback of this.events[event]) {
 			callback(...args);

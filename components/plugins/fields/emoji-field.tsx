@@ -131,7 +131,8 @@ export function EmojiField({
 														if (matches.length === 0) {
 															return (
 																<CommandEmpty className="col-span-8 p-4 text-sm text-center text-muted-foreground">
-																	No matching emojis found for "{inputValue}"
+																	No matching emojis found for `&quot;`
+																	{inputValue}`&quot;`
 																</CommandEmpty>
 															);
 														}

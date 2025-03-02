@@ -11,8 +11,9 @@ import {
 } from "react";
 import type { Plugin } from "@/hooks/use-plugins";
 import { usePlugins } from "@/hooks/use-plugins";
-import { type GuildData, useGuild } from "@/hooks/use-guilds";
+import { useGuild } from "@/hooks/use-guilds";
 import { useParams } from "next/navigation";
+import type { GuildData } from "@/hooks/use-guilds";
 
 interface PluginsContextType {
 	pluginsData: Plugin[];
@@ -32,24 +33,82 @@ export function useServerPlugins() {
 	const params = useParams();
 	const guildId = params.id as string;
 	const { guildData } = useGuild(guildId);
-	const { plugins, status, error, refetchPlugins } = usePlugins(
-		guildData as GuildData,
-	);
+
+	// Use useMemo to prevent recreating this object on every render
+	const formattedGuildData = useMemo(() => {
+		return (
+			guildData || {
+				id: guildId,
+				name: "Unknown Server",
+				channels: [],
+				roles: [],
+				category_count: 0,
+				text_channel_count: 0,
+				voice_channel_count: 0,
+				guild_details: {
+					id: guildId,
+					name: "Unknown Server",
+					icon: null,
+					features: [],
+					owner_id: "",
+					approximate_member_count: 0,
+					createdAt: new Date().toISOString(),
+				},
+				rolesCount: 0,
+				created_at: new Date().toISOString(),
+			}
+		);
+	}, [guildData, guildId]);
+
+	const {
+		plugins,
+		status,
+		error,
+		refetchPlugins: originalRefetchPlugins,
+	} = usePlugins(formattedGuildData);
+
 	const { pluginsData, updatePlugins, lastUpdated } = usePluginsContext();
 
 	const prevGuildIdRef = useRef<string | null>(null);
+	const pluginsUpdatedRef = useRef(false);
 
+	// Simplified refetchPlugins that doesn't cause infinite loops
+	const refetchPlugins = useCallback(async () => {
+		try {
+			// Call the original refetch function
+			const freshData = await originalRefetchPlugins();
+
+			// If we get fresh data back, update the context directly
+			if (freshData && freshData.length > 0) {
+				updatePlugins(freshData);
+			}
+			return freshData;
+		} catch (err) {
+			console.error("Error in refetchPlugins:", err);
+			return null;
+		}
+	}, [originalRefetchPlugins, updatePlugins]);
+
+	// Update plugins only once when they first load or when server changes
+	useEffect(() => {
+		// Skip if no plugins or if we already updated for this server
+		if (!plugins?.length || pluginsUpdatedRef.current) return;
+
+		// Update the context with the plugins
+		updatePlugins(plugins);
+		pluginsUpdatedRef.current = true;
+	}, [plugins, updatePlugins]);
+
+	// Reset the update flag when server changes
 	useEffect(() => {
 		if (guildId && prevGuildIdRef.current !== guildId) {
 			console.log(
 				`useServerPlugins: Zmieniono serwer z ${prevGuildIdRef.current} na ${guildId}`,
 			);
 			prevGuildIdRef.current = guildId;
-			if (plugins && plugins.length > 0) {
-				updatePlugins(plugins);
-			}
+			pluginsUpdatedRef.current = false;
 		}
-	}, [guildId, plugins, updatePlugins]);
+	}, [guildId]);
 
 	return {
 		pluginsData,
@@ -65,15 +124,19 @@ export function PluginsProvider({ children }: { children: React.ReactNode }) {
 	const [pluginsData, setPluginsData] = useState<Plugin[]>([]);
 	const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
 
+	// Keep track of the last update to prevent duplicate updates
+	const lastPluginsJsonRef = useRef<string>("");
+
 	const updatePlugins = useCallback((plugins: Plugin[]) => {
-		setPluginsData((prevPlugins) => {
-			// Check if the plugins are the same
-			if (JSON.stringify(prevPlugins) === JSON.stringify(plugins)) {
-				return prevPlugins;
-			}
+		// Stringify once for comparison
+		const pluginsJson = JSON.stringify(plugins);
+
+		// Only update if the plugins have actually changed
+		if (pluginsJson !== lastPluginsJsonRef.current) {
+			lastPluginsJsonRef.current = pluginsJson;
+			setPluginsData(plugins);
 			setLastUpdated(Date.now());
-			return plugins;
-		});
+		}
 	}, []);
 
 	const contextValue = useMemo(
