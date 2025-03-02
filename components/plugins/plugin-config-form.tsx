@@ -80,7 +80,7 @@ export function PluginConfigForm({
 				Object.assign(values, parsed);
 			}
 		} catch (error) {
-			console.error("Błąd parsowania niezapisanych zmian:", error);
+			console.error("Error parsing unsaved changes:", error);
 		}
 
 		// Pola specyficzne dla plugin.id
@@ -102,6 +102,7 @@ export function PluginConfigForm({
 				formFields.push(
 					<MessageField
 						key="reward_message"
+						guildId={guildId}
 						name="reward_message"
 						label="Reward message"
 						description="Message sent when a user reaches a new level. You can use {level} as a placeholder."
@@ -150,6 +151,7 @@ export function PluginConfigForm({
 				formFields.push(
 					<MessageField
 						key="welcome_message"
+						guildId={guildId}
 						name="welcome_message"
 						label="Welcome message"
 						description="Message sent when a user joins the server"
