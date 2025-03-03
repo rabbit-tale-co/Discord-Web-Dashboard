@@ -19,6 +19,11 @@ function getGuildId(guildData: { guild_details?: { id: string }; id?: string }):
 	return guildData.guild_details?.id || guildData.id;
 }
 
+// Add updatePluginsCache function
+function updatePluginsCache(guildId: string, plugins: Plugin[]) {
+	setCachedData(`plugins-${guildId}`, plugins, CACHE_TIME);
+}
+
 async function getPluginsFromAPI(guildId: string): Promise<Plugin[]> {
 	try {
 		const bot_id = process.env.NEXT_PUBLIC_BOT_ID;
@@ -35,7 +40,7 @@ async function getPluginsFromAPI(guildId: string): Promise<Plugin[]> {
 		const data = await response.json();
 
 		if (data) {
-			setCachedData(`plugins-${guildId}`, data, CACHE_TIME);
+			updatePluginsCache(guildId, data);
 		}
 		return data;
 	} catch (err) {
@@ -68,7 +73,7 @@ export default function usePlugins(guildData: GuildData) {
 
 			setPlugins(data);
 			setStatus("success");
-			return data; // Return data for consumers
+			return data;
 		} catch (err) {
 			setError(err as Error);
 			setStatus("error");
@@ -92,4 +97,4 @@ export default function usePlugins(guildData: GuildData) {
 	return { plugins, status, error, refetchPlugins };
 }
 
-export { usePlugins };
+export { usePlugins, updatePluginsCache };

@@ -22,7 +22,7 @@ import Config from "@/components/dashbaord/plugins/config";
 export default function PluginPage() {
 	const params = useParams();
 	const guildId = params.id as string;
-	const pluginId = params.pluginId as string; // Prawidłowe pobieranie ID pluginu
+	const pluginId = params.pluginId as string;
 	const { pluginsData, refetchPlugins, lastUpdated } = useServerPlugins();
 	const [plugin, setPlugin] = useState<Plugin | null>(null);
 	const [status, setStatus] = useState<"loading" | "error" | "success">(
@@ -41,6 +41,26 @@ export default function PluginPage() {
 			}
 		}
 	}, [pluginsData, pluginId]);
+
+	// Listen for plugin config updates
+	useEffect(() => {
+		const handlePluginConfigSaved = (event: Event) => {
+			const customEvent = event as CustomEvent<{ pluginId: string }>;
+			if (customEvent.detail?.pluginId === pluginId) {
+				// Refetch plugins to get the latest data
+				refetchPlugins();
+			}
+		};
+
+		window.addEventListener("plugin-config-saved", handlePluginConfigSaved);
+
+		return () => {
+			window.removeEventListener(
+				"plugin-config-saved",
+				handlePluginConfigSaved,
+			);
+		};
+	}, [pluginId, refetchPlugins]);
 
 	const handleSave = async () => {
 		if (!plugin) return;

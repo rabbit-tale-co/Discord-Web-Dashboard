@@ -35,8 +35,10 @@ import { ArrayField } from "./fields/array-field";
 import { ColorField } from "./fields/color-field";
 import { MessageField } from "./fields/message-field";
 import { EmojiField } from "./fields/emoji-field";
-import { toast } from "sonner";
+import { toast as sonnerToast } from "sonner";
 import { deepEqual } from "@/lib/deep-equal";
+import type { ButtonHTMLAttributes, DetailedHTMLProps } from "react";
+import { updatePluginsCache } from "@/hooks/use-plugins";
 
 type PluginConfigFormProps = {
 	plugin: Plugin;
@@ -45,6 +47,68 @@ type PluginConfigFormProps = {
 };
 
 const UNSAVED_KEY = (pluginId: string) => `unsaved-plugin-${pluginId}`;
+
+interface FormToastProps {
+	id: string | number;
+	message: string;
+	onSave: () => void;
+	onReset: () => void;
+}
+
+/** Custom toast component for form changes */
+function FormToast({ id, message, onSave, onReset }: FormToastProps) {
+	return (
+		<div className="flex rounded-lg bg-white shadow-lg ring-1 ring-black/5 w-full md:max-w-[500px] items-center p-4 dark:bg-[#161615]">
+			<div className="flex flex-1 items-center">
+				<div className="w-full">
+					<p className="text-sm font-medium text-gray-900 dark:text-white">
+						{message}
+					</p>
+				</div>
+			</div>
+			<div className="flex gap-2 ml-5">
+				<button
+					type="button"
+					className="rounded bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+					onClick={() => {
+						onReset();
+						sonnerToast.dismiss(id);
+					}}
+				>
+					Reset
+				</button>
+				<button
+					type="button"
+					className="rounded bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900 dark:text-indigo-200 dark:hover:bg-indigo-800"
+					onClick={() => {
+						onSave();
+						// Don't dismiss here as the save action will handle the dismissal
+					}}
+				>
+					Save changes
+				</button>
+			</div>
+		</div>
+	);
+}
+
+/** Custom toast function for form changes */
+function showFormToast(props: Omit<FormToastProps, "id">) {
+	return sonnerToast.custom(
+		(id) => (
+			<FormToast
+				id={id}
+				message={props.message}
+				onSave={props.onSave}
+				onReset={props.onReset}
+			/>
+		),
+		{
+			duration: Number.POSITIVE_INFINITY,
+			className: "form-toast",
+		},
+	);
+}
 
 export function PluginConfigForm({
 	plugin,
@@ -526,13 +590,21 @@ export function PluginConfigForm({
 		return () => clearTimeout(timer);
 	}, [formState.defaultValues, form]);
 
-	// Zapis zmian do localStorage
+	// Save changes to localStorage
 	useEffect(() => {
 		const subscription = form.watch((value) => {
-			localStorage.setItem(UNSAVED_KEY(plugin.id), JSON.stringify(value));
+			// Ensure enabled state is explicitly included
+			const valueToSave = { ...value };
+
+			// If plugin has an enabled field but it's not in the form values, add it
+			if ("enabled" in plugin && !("enabled" in valueToSave)) {
+				valueToSave.enabled = plugin.enabled;
+			}
+
+			localStorage.setItem(UNSAVED_KEY(plugin.id), JSON.stringify(valueToSave));
 		});
 		return () => subscription.unsubscribe();
-	}, [form, plugin.id]);
+	}, [form, plugin]);
 
 	// Split the form watch and toast logic into separate effects
 	useEffect(() => {
@@ -576,12 +648,22 @@ export function PluginConfigForm({
 			hasShownToastRef.current = false;
 			setHasUnsavedChanges(false);
 			prevPluginIdRef.current = plugin.id;
-			initialSavedValuesRef.current = formState.defaultValues;
+
+			// Make sure we store the exact plugin data as the initial values
+			const initialValues = { ...formState.defaultValues };
+
+			// Explicitly set enabled state to ensure consistency
+			if ("enabled" in plugin) {
+				initialValues.enabled = plugin.enabled;
+			}
+
+			initialSavedValuesRef.current = initialValues;
+
 			const unsaved = localStorage.getItem(UNSAVED_KEY(plugin.id));
 			if (unsaved) {
 				form.reset(JSON.parse(unsaved));
 			} else {
-				form.reset(formState.defaultValues);
+				form.reset(initialValues);
 			}
 		}
 		// If only the view type changed (basic/advanced)
@@ -603,13 +685,13 @@ export function PluginConfigForm({
 			if (hasChanges) {
 				// Force-dismiss any existing toast to ensure it gets recreated
 				if (toastIdRef.current) {
-					toast.dismiss(toastIdRef.current);
+					sonnerToast.dismiss(toastIdRef.current);
 					toastIdRef.current = undefined;
 				}
 				hasShownToastRef.current = false; // Force the toast to show again in the next effect run
 			}
 		}
-	}, [plugin.id, type, form, formState.defaultValues]);
+	}, [plugin, type, form, formState.defaultValues]);
 
 	// Memoize the onSubmit function to prevent it changing on every render
 	const onSubmitMemoized = useCallback(
@@ -621,7 +703,7 @@ export function PluginConfigForm({
 					configToSave = JSON.parse(data.config as string);
 				} catch (e) {
 					console.error("Invalid JSON format", e);
-					toast.error("Invalid JSON format", {
+					sonnerToast.error("Invalid JSON format", {
 						description: "Please check your JSON format and try again.",
 					});
 					return;
@@ -639,7 +721,7 @@ export function PluginConfigForm({
 							const errorMessages = error.errors
 								.map((err) => `${err.path.join(".")}: ${err.message}`)
 								.join("\n");
-							toast.error("Validation failed", {
+							sonnerToast.error("Validation failed", {
 								description: errorMessages,
 							});
 							return;
@@ -661,14 +743,7 @@ export function PluginConfigForm({
 					}),
 				});
 
-				console.log(
-					"API Response status:",
-					response.status,
-					response.statusText,
-				);
-
 				if (!response.ok) {
-					// Attempt to get response text and parse as JSON if possible
 					const responseText = await response.text();
 					console.error("Error response text:", responseText);
 
@@ -685,42 +760,121 @@ export function PluginConfigForm({
 					);
 				}
 
-				// Update UI and local storage
+				// Store the submitted configuration as the latest saved state
+				// This is what will be used both for form resets and localStorage
+				initialSavedValuesRef.current = { ...configToSave };
+
+				// Update localStorage with the latest configuration
+				localStorage.setItem(
+					UNSAVED_KEY(plugin.id),
+					JSON.stringify(configToSave),
+				);
+
+				// Update UI state
 				setHasUnsavedChanges(false);
 				hasShownToastRef.current = false;
-				localStorage.removeItem(UNSAVED_KEY(plugin.id));
+
 				if (toastIdRef.current) {
-					toast.dismiss(toastIdRef.current);
+					sonnerToast.dismiss(toastIdRef.current);
 					toastIdRef.current = undefined;
 				}
 
-				// Update the initial saved values reference
-				initialSavedValuesRef.current = form.getValues();
+				// Get the updated plugin data and update cache
+				const updatedPluginResponse = await fetch(
+					`/api/plugins?bot_id=${process.env.NEXT_PUBLIC_BOT_ID}&guild_id=${guildId}`,
+					{
+						cache: "no-store",
+						headers: {
+							"Cache-Control": "no-cache",
+						},
+					},
+				);
+
+				if (updatedPluginResponse.ok) {
+					const updatedPlugins = await updatedPluginResponse.json();
+					// Find the updated plugin
+					const updatedPlugin = updatedPlugins.find(
+						(p: Plugin) => p.id === plugin.id,
+					);
+					if (updatedPlugin) {
+						// Create a merged version that includes both API data and our latest saved values
+						const mergedPlugin = { ...updatedPlugin, ...configToSave };
+						// Update the plugin in the plugins array
+						const newPlugins = updatedPlugins.map((p: Plugin) =>
+							p.id === plugin.id ? mergedPlugin : p,
+						);
+						// Update the cache with merged data
+						updatePluginsCache(guildId, newPlugins);
+					}
+				}
+
+				// Manually reset the form with our configToSave to ensure inputs have the latest values
+				form.reset(configToSave);
+
+				// Dispatch the event after cache is updated
+				if (typeof window !== "undefined") {
+					window.dispatchEvent(
+						new CustomEvent("plugin-config-saved", {
+							detail: {
+								pluginId: plugin.id,
+								config: configToSave,
+							},
+						}),
+					);
+				}
 
 				// Show success toast
-				toast.success("Configuration saved", {
+				sonnerToast.success("Configuration saved", {
 					description: "Plugin settings have been successfully updated.",
 				});
 			} catch (error) {
 				console.error("Error saving plugin settings:", error);
-				toast.error("Failed to save plugin configuration", {
+				sonnerToast.error("Failed to save plugin configuration", {
 					description:
 						error instanceof Error ? error.message : "Please try again later.",
 				});
 			}
 		},
-		[plugin.id, guildId, formState.schema, form, type],
+		[plugin.id, guildId, formState.schema, type, form],
 	);
 
 	// Use onSubmitMemoized instead of onSubmit for form submission
 	const onSubmit = onSubmitMemoized;
 
-	// Separate effect to handle toast visibility
+	// Effect to listen for plugin-config-saved events
+	useEffect(() => {
+		const handlePluginSaved = (event: Event) => {
+			const customEvent = event as CustomEvent<{
+				pluginId: string;
+				config?: Record<string, unknown>;
+			}>;
+			// Only respond to events for this plugin
+			if (customEvent.detail?.pluginId === plugin.id) {
+				// If the event contains config data, use it directly
+				if (customEvent.detail.config) {
+					initialSavedValuesRef.current = customEvent.detail.config;
+					form.reset(customEvent.detail.config);
+				} else {
+					// Otherwise fall back to our saved values reference
+					form.reset(initialSavedValuesRef.current);
+				}
+				initialRenderRef.current = true;
+			}
+		};
+
+		window.addEventListener("plugin-config-saved", handlePluginSaved);
+
+		return () => {
+			window.removeEventListener("plugin-config-saved", handlePluginSaved);
+		};
+	}, [plugin.id, form]);
+
+	// Update the toast effect to use the new custom toast
 	useEffect(() => {
 		// Always dismiss toast when there are no unsaved changes
 		if (!hasUnsavedChanges) {
 			if (toastIdRef.current) {
-				toast.dismiss(toastIdRef.current);
+				sonnerToast.dismiss(toastIdRef.current);
 				toastIdRef.current = undefined;
 			}
 			hasShownToastRef.current = false;
@@ -734,72 +888,29 @@ export function PluginConfigForm({
 		) {
 			hasShownToastRef.current = true;
 
-			// Using proper Sonner styling options
-			toastIdRef.current = toast(
-				<div className="flex justify-between items-center w-full">
-					<div className="text-white font-medium">You have unsaved changes</div>
-					<div className="flex gap-2 ml-8">
-						<Button
-							variant="outline"
-							onClick={() => {
-								try {
-									// Reset the form to initial values
-									form.reset(initialSavedValuesRef.current);
-									// Clean up localStorage
-									localStorage.removeItem(UNSAVED_KEY(plugin.id));
-									// Update UI state
-									setHasUnsavedChanges(false);
-									hasShownToastRef.current = false;
-									// Dismiss toast
-									toast.dismiss(toastIdRef.current);
-									toastIdRef.current = undefined;
-								} catch (error) {
-									console.error("Error during form reset:", error);
-								}
-							}}
-							className="text-white"
-						>
-							Reset
-						</Button>
-						<Button
-							onClick={() => form.handleSubmit(onSubmitMemoized)()}
-							className="bg-discord-success text-discord-success-foreground hover:bg-discord-success/90"
-						>
-							Save config
-						</Button>
-					</div>
-				</div>,
-				{
-					duration: Number.POSITIVE_INFINITY,
-					style: {
-						position: "fixed",
-						bottom: "1rem",
-						right: "50%",
-						transform: "translateX(50%)",
-						width: "600px",
-						maxWidth: "90vw",
-						padding: ".5rem .5rem .5rem 1rem",
-						background: "black",
-						border: "none",
-						boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
-						color: "white",
-					},
-					// Remove other Sonner styling that might interfere
-					unstyled: true,
-					className: "rounded-full border-none",
+			toastIdRef.current = showFormToast({
+				message: "You have unsaved changes",
+				onSave: () => form.handleSubmit(onSubmitMemoized)(),
+				onReset: () => {
+					try {
+						// Reset the form to initial values
+						form.reset(initialSavedValuesRef.current);
+						// Clean up localStorage
+						localStorage.removeItem(UNSAVED_KEY(plugin.id));
+						// Update UI state
+						setHasUnsavedChanges(false);
+						hasShownToastRef.current = false;
+					} catch (error) {
+						console.error("Error during form reset:", error);
+					}
 				},
-			);
+			});
 		}
 
-		// Don't dismiss toast on cleanup - this prevents the toast from disappearing
-		// when switching between basic and advanced views
-		// However, we should dismiss on full component unmount
 		return () => {
-			// Check if it's a full unmount (when the plugin changes)
-			// by checking if the plugin ID reference is different
 			if (plugin.id !== prevPluginIdRef.current) {
 				if (toastIdRef.current) {
-					toast.dismiss(toastIdRef.current);
+					sonnerToast.dismiss(toastIdRef.current);
 					toastIdRef.current = undefined;
 				}
 			}
