@@ -1,18 +1,41 @@
 import type React from "react";
-import { useCallback, useMemo } from "react";
-import type { BaseEditor } from "slate";
+import {
+	useCallback,
+	useMemo,
+	useState,
+	useEffect,
+	memo,
+	forwardRef,
+} from "react";
+import type { BaseEditor, Descendant } from "slate";
+import type { Node as SlateNode } from "slate";
 import {
 	createEditor,
 	Transforms,
 	Text,
 	Element as SlateElement,
-	type Node as SlateNode,
 	Editor,
 	Range,
 } from "slate";
-import { Slate, Editable, withReact, ReactEditor } from "slate-react";
+import { Slate, Editable, withReact } from "slate-react";
+import type { ReactEditor } from "slate-react";
 import { withHistory } from "slate-history";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+	Command,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+	CommandList,
+} from "@/components/ui/command";
+import { SmileIcon } from "lucide-react";
 
 // Deklaracja globalna dla rozszerzenia Window
 interface WindowWithEditors extends Window {
@@ -68,12 +91,20 @@ interface MentionTextareaProps {
 	onChange?: (value: string) => void;
 	value?: string;
 	className?: string;
+	maxLength?: number;
+	style?: React.CSSProperties;
+	singleLine?: boolean;
+	rows?: number;
+	showEmojiPicker?: boolean;
+	guildId?: string;
 	onMentionStart?: (data: {
 		type: "variable" | "role" | "channel";
 		search: string;
 		domRect: DOMRect;
 	}) => void;
 	onMentionEnd?: () => void;
+	onFocus?: () => void;
+	onBlur?: () => void;
 }
 
 export function Textarea({
@@ -92,101 +123,158 @@ export function Textarea({
 	);
 }
 
-// Serialize Slate nodes to HTML
-const serializeToHtml = (nodes: SlateNode[]): string => {
-	return nodes
-		.map((node) => {
-			if (Text.isText(node)) {
-				return `<span data-slate-node="text">${node.text}</span>`;
-			}
+// Empty value constant - memoize this at module level to avoid recreation
+const EMPTY_VALUE: ParagraphElement[] = [
+	{ type: "paragraph", children: [{ text: "" }] },
+];
 
-			if (SlateElement.isElement(node)) {
-				if (node.type === "mention") {
-					const element = node as MentionElement;
-					// Store the actual value in the HTML, but style based on type
-					const mentionClass =
-						element.mentionType === "role"
-							? "bg-blue-100 text-blue-800 border border-blue-300"
-							: element.mentionType === "channel"
-								? "bg-green-100 text-green-800 border border-green-300"
-								: "bg-purple-100 text-purple-800 border border-purple-300";
+// Cache for deserialized HTML values to avoid expensive parsing operations
+const deserializationCache = new Map<string, ParagraphElement[]>();
 
-					// Generate a human-readable version for display in HTML
-					let displayText = element.value;
-
-					if (
-						element.mentionType === "role" &&
-						displayText.startsWith("<@") &&
-						displayText.endsWith(">")
-					) {
-						const roleId = displayText.substring(2, displayText.length - 1);
-						displayText = "@role";
-
-						if (typeof window !== "undefined") {
-							try {
-								const typedWindow = window as WindowWithGuildData;
-								if (typedWindow.__guildData?.roles) {
-									const role = typedWindow.__guildData.roles.find(
-										(r) => r.id === roleId,
-									);
-									if (role) {
-										displayText = `@${role.name}`;
-									}
-								}
-							} catch (e) {
-								console.error(
-									"Error getting role name during serialization:",
-									e,
-								);
-							}
-						}
-					} else if (
-						element.mentionType === "channel" &&
-						displayText.startsWith("<#") &&
-						displayText.endsWith(">")
-					) {
-						const channelId = displayText.substring(2, displayText.length - 1);
-						displayText = "#channel";
-
-						if (typeof window !== "undefined") {
-							try {
-								const typedWindow = window as WindowWithGuildData;
-								if (typedWindow.__guildData?.channels) {
-									const channel = typedWindow.__guildData.channels.find(
-										(c) => c.id === channelId,
-									);
-									if (channel) {
-										displayText = `#${channel.name}`;
-									}
-								}
-							} catch (e) {
-								console.error(
-									"Error getting channel name during serialization:",
-									e,
-								);
-							}
-						}
-					}
-
-					// Use the actual value (with IDs) as a data attribute, display the friendly name
-					return `<span class="${mentionClass} rounded-md px-1 py-0.5 text-md select-all" data-slate-leaf="true" data-slate-inline="true" data-slate-void="true" contenteditable="false" data-type="mention" data-mention-type="${element.mentionType}" data-value="${element.value}"><span data-slate-string="true">${displayText}</span></span>`;
-				}
-
-				if (node.type === "paragraph") {
-					return `<div data-slate-node="element" style="position: relative;">${serializeToHtml(node.children)}</div>`;
+// Function to get role name from ID
+const getRoleNameFromId = (roleId: string): string => {
+	try {
+		if (typeof window !== "undefined") {
+			const typedWindow = window as WindowWithGuildData;
+			if (typedWindow.__guildData?.roles) {
+				const role = typedWindow.__guildData.roles.find((r) => r.id === roleId);
+				if (role) {
+					return role.name;
 				}
 			}
-
-			return "";
-		})
-		.join("");
+		}
+	} catch (e) {
+		console.error("Error getting role name:", e);
+	}
+	return "unknown-role";
 };
 
-// Deserialize HTML to Slate nodes
+// Function to get channel name from ID
+const getChannelNameFromId = (channelId: string): string => {
+	try {
+		if (typeof window !== "undefined") {
+			const typedWindow = window as WindowWithGuildData;
+			if (typedWindow.__guildData?.channels) {
+				const channel = typedWindow.__guildData.channels.find(
+					(c) => c.id === channelId,
+				);
+				if (channel) {
+					return channel.name;
+				}
+			}
+		}
+	} catch (e) {
+		console.error("Error getting channel name:", e);
+	}
+	return "unknown-channel";
+};
+
+// Define a version of serializeToHtml that's optimized and memoized by input
+// This helps avoid recomputing the same HTML strings repeatedly
+const serializeToHtmlMemoized = (() => {
+	const cache = new Map<string, string>();
+	let lastInput: Descendant[] = [];
+	let lastOutput = "";
+
+	return (nodes: Descendant[]): string => {
+		// For small inputs, simple reference check is enough
+		if (nodes === lastInput) return lastOutput;
+
+		// Stringify for cache lookup
+		const nodeKey = JSON.stringify(nodes);
+		const cached = cache.get(nodeKey);
+		if (cached) return cached;
+
+		// Original logic but cached
+		const result = nodes
+			.map((node) => {
+				if (Text.isText(node)) {
+					return node.text;
+				}
+
+				if (SlateElement.isElement(node)) {
+					if (node.type === "mention") {
+						const element = node as MentionElement;
+						// Store the actual value in the HTML, but style based on type
+						const mentionClass =
+							element.mentionType === "role"
+								? "bg-blue-100 text-blue-800 border border-blue-300"
+								: element.mentionType === "channel"
+									? "bg-green-100 text-green-800 border border-green-300"
+									: "bg-purple-100 text-purple-800 border border-purple-300";
+
+						// Generate a human-readable version for display in HTML
+						let displayText = element.value || "";
+
+						if (
+							element.mentionType === "role" &&
+							displayText.startsWith("<@") &&
+							displayText.endsWith(">")
+						) {
+							const roleId = displayText.substring(2, displayText.length - 1);
+							const roleName = getRoleNameFromId(roleId);
+							displayText = `@${roleName}`;
+						} else if (
+							element.mentionType === "channel" &&
+							displayText.startsWith("<#") &&
+							displayText.endsWith(">")
+						) {
+							const channelId = displayText.substring(
+								2,
+								displayText.length - 1,
+							);
+							const channelName = getChannelNameFromId(channelId);
+							displayText = `#${channelName}`;
+						}
+
+						// Use the actual value (with IDs) as a data attribute, display the friendly name
+						return `<span class="${mentionClass} rounded-md px-1 py-0.5 text-md select-all" data-slate-leaf="true" data-slate-inline="true" data-slate-void="true" contenteditable="false" data-type="mention" data-mention-type="${element.mentionType}" data-value="${element.value || ""}"><span data-slate-string="true">${displayText}</span></span>`;
+					}
+
+					if (node.type === "paragraph") {
+						return `<div data-slate-node="element" style="position: relative;">${serializeToHtmlMemoized(node.children)}</div>`;
+					}
+				}
+
+				return "";
+			})
+			.join("");
+
+		// Cache the result
+		if (cache.size > 50) {
+			// Prevent unbounded growth
+			const firstKey = cache.keys().next().value;
+			if (firstKey) {
+				cache.delete(firstKey);
+			}
+		}
+		cache.set(nodeKey, result);
+
+		// Update last references
+		lastInput = nodes;
+		lastOutput = result;
+
+		return result;
+	};
+})();
+
+// Optimize the deserializeHtml function to use caching
 const deserializeHtml = (html: string): ParagraphElement[] => {
+	if (!html || typeof html !== "string") {
+		return [...EMPTY_VALUE];
+	}
+
+	// Normalize the HTML to avoid cache misses due to insignificant whitespace differences
+	const normalizedHtml = html.replace(/>\s+</g, "><").trim();
+
+	// Check cache first
+	const cachedResult = deserializationCache.get(normalizedHtml);
+	if (cachedResult) {
+		return cachedResult;
+	}
+
 	const div = document.createElement("div");
-	// Usuń zbędne białe znaki z HTML przed deserializacją
-	div.innerHTML = html.replace(/>\s+</g, "><").trim();
+	div.innerHTML = normalizedHtml;
 
 	// Process text and convert variables to mention elements
 	const processText = (text: string): (CustomText | MentionElement)[] => {
@@ -221,8 +309,8 @@ const deserializeHtml = (html: string): ParagraphElement[] => {
 			result.push({
 				type: "mention",
 				mentionType,
-				value,
 				children: [{ text: "" }],
+				value,
 			});
 
 			lastIndex = match.index + match[0].length;
@@ -230,206 +318,180 @@ const deserializeHtml = (html: string): ParagraphElement[] => {
 		}
 
 		// Add any remaining text
-		if (lastIndex < text.length) {
-			result.push({ text: text.slice(lastIndex) });
+		const afterText = text.slice(lastIndex);
+		if (afterText) {
+			result.push({ text: afterText });
 		}
 
 		return result;
 	};
 
-	const processNode = (node: Node): (CustomText | MentionElement)[] => {
-		if (node.nodeType === Node.TEXT_NODE) {
-			const text = node.textContent || "";
-			return processText(text);
-		}
-
-		if (node.nodeType === Node.ELEMENT_NODE) {
-			const element = node as HTMLElement;
-
-			// Handle mention elements
-			if (element.getAttribute("data-type") === "mention") {
-				const mentionTypeAttr = element.getAttribute("data-mention-type");
-				let mentionType: "variable" | "role" | "channel" = "variable";
-
-				if (mentionTypeAttr === "role") {
-					mentionType = "role";
-				} else if (mentionTypeAttr === "channel") {
-					mentionType = "channel";
-				}
-
-				// Get the value from data-value attribute if available, otherwise fallback to content
-				const value =
-					element.getAttribute("data-value") || element.textContent || "";
-
-				return [
-					{
-						type: "mention",
-						mentionType,
-						value,
-						children: [{ text: "" }],
-					},
-				];
-			}
-
-			// Process child nodes
-			const children: (CustomText | MentionElement)[] = [];
-			for (const child of element.childNodes) {
-				children.push(...processNode(child));
-			}
-			return children;
-		}
-
-		return [];
+	// Function to extract the text content from an HTML element
+	const getTextFromElement = (element: HTMLElement): string => {
+		return element.textContent || "";
 	};
 
-	// Process all nodes and flatten the result
-	const children = Array.from(div.childNodes).flatMap(processNode);
+	// Process the parsed HTML to create Slate nodes
+	const nodes: ParagraphElement[] = [];
 
-	// For simple content, ensure it's properly processed
-	if (html.trim() && children.length === 0) {
-		// Try direct processing of the HTML content
-		return [{ type: "paragraph", children: processText(html) }];
+	// Process div children (paragraphs)
+	const paragraphs = div.children.length ? div.children : [div];
+
+	for (let i = 0; i < paragraphs.length; i++) {
+		const p = paragraphs[i] as HTMLElement;
+		// Extract the text content
+		const textContent = getTextFromElement(p);
+
+		// Create a paragraph element with mentions
+		const paragraphElement: ParagraphElement = {
+			type: "paragraph",
+			children: processText(textContent),
+		};
+
+		nodes.push(paragraphElement);
 	}
 
-	return [{ type: "paragraph", children }];
+	// Return empty paragraph if no content was generated
+	if (nodes.length === 0) {
+		nodes.push({
+			type: "paragraph",
+			children: [{ text: "" }],
+		});
+	}
+
+	// Cache the result (limit cache size to prevent memory issues)
+	if (deserializationCache.size > 100) {
+		const firstKey = deserializationCache.keys().next().value;
+		if (firstKey) {
+			deserializationCache.delete(firstKey);
+		}
+	}
+	deserializationCache.set(normalizedHtml, nodes);
+
+	return nodes;
 };
 
-// Component to render the different elements
-const Element = ({
-	attributes,
-	children,
-	element,
-}: {
-	attributes: React.HTMLAttributes<HTMLElement>;
-	children: React.ReactNode;
-	element: CustomElement;
-}) => {
-	if (element.type === "mention") {
-		// Store the actual ID/value for form submission
-		const originalValue = element.value;
-		// Display text will be user-friendly
-		let displayText = originalValue;
-		let mentionStyle = "bg-discord-foreground text-discord-bg";
+// Memoize the Element component using React.memo to prevent unnecessary re-renders
+const Element = memo(
+	({
+		attributes,
+		children,
+		element,
+	}: {
+		attributes: React.HTMLAttributes<HTMLElement>;
+		children: React.ReactNode;
+		element: CustomElement;
+	}) => {
+		if (element.type === "mention") {
+			// Store the actual ID/value for form submission
+			const originalValue = element.value || "";
+			// Display text will be user-friendly
+			let displayText = originalValue;
+			let mentionStyle = "bg-discord-foreground text-discord-bg";
 
-		if (element.mentionType === "role") {
-			// For roles: Change style and extract display name
-			mentionStyle = "bg-blue-100 text-blue-800 border border-blue-300";
-			// If the value is in format <@123456>, display a friendly format
-			if (displayText.startsWith("<@") && displayText.endsWith(">")) {
-				const roleId = displayText.substring(2, displayText.length - 1);
-				displayText = "@role";
-
-				// Try to get role name from window if available
-				if (typeof window !== "undefined") {
-					try {
-						const typedWindow = window as WindowWithGuildData;
-						if (typedWindow.__guildData?.roles) {
-							const role = typedWindow.__guildData.roles.find(
-								(r) => r.id === roleId,
-							);
-							if (role) {
-								displayText = `@${role.name}`;
-							}
-						}
-					} catch (e) {
-						console.error("Error getting role name:", e);
-					}
+			if (element.mentionType === "role") {
+				// For roles: Change style and extract display name
+				mentionStyle = "bg-blue-100 text-blue-800 border border-blue-300";
+				// If the value is in format <@123456>, display a friendly format
+				if (displayText.startsWith("<@") && displayText.endsWith(">")) {
+					const roleId = displayText.substring(2, displayText.length - 1);
+					const roleName = getRoleNameFromId(roleId);
+					displayText = `@${roleName}`;
 				}
-			}
-		} else if (element.mentionType === "channel") {
-			// For channels: Change style and extract display name
-			mentionStyle = "bg-green-100 text-green-800 border border-green-300";
-			// If the value is in format <#123456>, display a friendly format
-			if (displayText.startsWith("<#") && displayText.endsWith(">")) {
-				const channelId = displayText.substring(2, displayText.length - 1);
-				displayText = "#channel";
-
-				// Try to get channel name from window if available
-				if (typeof window !== "undefined") {
-					try {
-						const typedWindow = window as WindowWithGuildData;
-						if (typedWindow.__guildData?.channels) {
-							const channel = typedWindow.__guildData.channels.find(
-								(c) => c.id === channelId,
-							);
-							if (channel) {
-								displayText = `#${channel.name}`;
-							}
-						}
-					} catch (e) {
-						console.error("Error getting channel name:", e);
-					}
+			} else if (element.mentionType === "channel") {
+				// For channels: Change style and extract display name
+				mentionStyle = "bg-green-100 text-green-800 border border-green-300";
+				// If the value is in format <#123456>, display a friendly format
+				if (displayText.startsWith("<#") && displayText.endsWith(">")) {
+					const channelId = displayText.substring(2, displayText.length - 1);
+					const channelName = getChannelNameFromId(channelId);
+					displayText = `#${channelName}`;
 				}
+			} else {
+				// For variables: keep the existing style
+				mentionStyle = "bg-purple-100 text-purple-800 border border-purple-300";
 			}
-		} else {
-			// For variables: keep the existing style
-			mentionStyle = "bg-purple-100 text-purple-800 border border-purple-300";
+
+			return (
+				<span
+					{...attributes}
+					className={`${mentionStyle} rounded-md px-1 py-0.5 text-md select-all`}
+					contentEditable={false}
+					data-mention-type={element.mentionType}
+					data-value={originalValue}
+				>
+					{children}
+					<span>{displayText}</span>
+				</span>
+			);
 		}
 
-		return (
-			<span
-				{...attributes}
-				className={`${mentionStyle} rounded-md px-1 py-0.5 text-md select-all`}
-				data-slate-leaf="true"
-				data-slate-inline="true"
-				data-slate-void="true"
-				contentEditable={false}
-				data-type="mention"
-				data-mention-type={element.mentionType}
-				data-value={originalValue}
-			>
-				<span data-slate-string="true">{displayText}</span>
-				{children}
-			</span>
-		);
-	}
+		if (element.type === "mention-placeholder") {
+			// Different styling based on mention type
+			let placeholderIcon = "";
+			let placeholderStyle = "";
 
-	if (element.type === "mention-placeholder") {
-		// Different styling based on mention type
-		let placeholderIcon = "";
-		let placeholderStyle = "";
+			if (element.mentionType === "role") {
+				placeholderIcon = "@";
+				placeholderStyle = "bg-blue-100 text-blue-800 border border-blue-300";
+			} else if (element.mentionType === "channel") {
+				placeholderIcon = "#";
+				placeholderStyle =
+					"bg-green-100 text-green-800 border border-green-300";
+			} else {
+				placeholderIcon = "{";
+				placeholderStyle =
+					"bg-purple-100 text-purple-800 border border-purple-300";
+			}
 
-		if (element.mentionType === "role") {
-			placeholderIcon = "@";
-			placeholderStyle = "bg-blue-100 text-blue-800 border border-blue-300";
-		} else if (element.mentionType === "channel") {
-			placeholderIcon = "#";
-			placeholderStyle = "bg-green-100 text-green-800 border border-green-300";
-		} else {
-			placeholderIcon = "{";
-			placeholderStyle =
-				"bg-purple-100 text-purple-800 border border-purple-300";
+			return (
+				<span
+					{...attributes}
+					className={`${placeholderStyle} rounded-md px-1 py-0.5 text-md select-all`}
+					contentEditable={false}
+				>
+					{children}
+					<span>{placeholderIcon}</span>
+				</span>
+			);
 		}
 
-		return (
-			<span
-				{...attributes}
-				className={`${placeholderStyle} rounded-md px-1 py-0.5 text-md select-all`}
-				data-slate-leaf="true"
-				data-slate-inline="true"
-				data-slate-void="true"
-				contentEditable={false}
-				data-type="mention-placeholder"
-				data-mention-type={element.mentionType}
-			>
-				<span data-slate-string="true">{placeholderIcon}</span>
-				{children}
-			</span>
-		);
+		return <div {...attributes}>{children}</div>;
+	},
+);
+
+// Optimize the getEditorInstance function with error handling and type safety
+export function getEditorInstance(
+	id: string,
+): (BaseEditor & ReactEditor) | null {
+	if (typeof window === "undefined") return null;
+
+	try {
+		const typedWindow = window as WindowWithEditors;
+		const instances = typedWindow.__slateEditorInstances || {};
+		return instances[id] || null;
+	} catch (error) {
+		console.error("Error getting editor instance:", error);
+		return null;
 	}
+}
 
-	return <div {...attributes}>{children}</div>;
-};
-
-// Main component
-export function MentionTextarea({
+// Memoize the MentionTextarea component using React.memo to prevent unnecessary re-renders
+export const MentionTextarea = memo(function MentionTextarea({
 	placeholder = "Type your message...",
 	onChange,
 	value = "",
 	className,
+	maxLength,
+	style,
+	singleLine = false,
+	rows = 3,
 	onMentionStart,
 	onMentionEnd,
+	onFocus,
+	onBlur,
 }: MentionTextareaProps) {
+	// Create editor only once per component instance
 	const editor = useMemo(() => {
 		const e = withHistory(withReact(createEditor()));
 
@@ -453,98 +515,124 @@ export function MentionTextarea({
 		return e;
 	}, []);
 
+	// Track focus state
+	const [isFocused, setIsFocused] = useState(false);
+
 	// Expose editor instance to window for direct access
-	if (typeof window !== "undefined") {
-		const typedWindow = window as WindowWithEditors;
-		typedWindow.__slateEditorInstances =
-			typedWindow.__slateEditorInstances || {};
-		typedWindow.__slateEditorInstances["mention-textarea"] = editor;
-	}
+	useEffect(() => {
+		if (typeof window !== "undefined") {
+			const typedWindow = window as WindowWithEditors;
+			typedWindow.__slateEditorInstances =
+				typedWindow.__slateEditorInstances || {};
+			typedWindow.__slateEditorInstances["mention-textarea"] = editor;
 
-	// Initialize with parsed HTML
-	const initialValue = useMemo(() => deserializeHtml(value), [value]);
+			// Cleanup on unmount
+			return () => {
+				if (typedWindow.__slateEditorInstances) {
+					// Use computed property to avoid delete operator
+					typedWindow.__slateEditorInstances = {
+						...typedWindow.__slateEditorInstances,
+						"mention-textarea": undefined as unknown as BaseEditor &
+							ReactEditor,
+					};
+				}
+			};
+		}
+	}, [editor]);
 
-	// Handle text input to detect variable patterns and convert them to mention elements
-	const handleDOMBeforeInput = useCallback(
-		(e: InputEvent) => {
-			const { inputType, data } = e;
+	// Calculate character count - memoized to prevent recalculation
+	const characterCount = useMemo(() => {
+		if (!value || typeof value !== "string") return 0;
+		// Simple regex to remove HTML tags for counting
+		return value.replace(/<[^>]*>/g, "").length;
+	}, [value]);
 
-			if (inputType === "insertText" && data) {
-				const { selection } = editor;
+	// Initialize with parsed HTML - improved to use cached parsing
+	const initialValue = useMemo(() => {
+		if (!value || typeof value !== "string") {
+			return [...EMPTY_VALUE];
+		}
+		return deserializeHtml(value);
+	}, [value]);
 
-				if (selection && Range.isCollapsed(selection)) {
-					// Don't handle trigger characters here as they're now handled in handleKeyDown
-					// to prevent them from being inserted into the editor
-					if (data === "@" || data === "#" || data === "{") {
+	// Track the current mention state
+	const [mentionState, setMentionState] = useState<{
+		active: boolean;
+		type: "variable" | "role" | "channel" | null;
+		search: string;
+	}>({
+		active: false,
+		type: null,
+		search: "",
+	});
+
+	// Memoize the editor change handler to prevent recreating on each render
+	const handleChange = useCallback(
+		(value: Descendant[]) => {
+			if (onChange) {
+				// Use the memoized serialization function
+				const html = serializeToHtmlMemoized(value);
+
+				// Check maxLength before processing further
+				if (maxLength !== undefined) {
+					const plainText =
+						typeof html === "string" ? html.replace(/<[^>]*>/g, "") : "";
+					if (plainText.length > maxLength) {
+						// Don't update if too long
 						return;
 					}
-
-					const before = Editor.before(editor, selection);
-
-					if (before) {
-						const beforeRange = {
-							anchor: before,
-							focus: selection.focus,
-						} as Range;
-						const beforeText = Editor.string(editor, beforeRange);
-
-						// When typing the closing } for a variable
-						if (beforeText.startsWith("{") && data === "}") {
-							e.preventDefault();
-
-							// Extract the variable name without {}
-							const varName = beforeText.substring(1);
-
-							// Delete the opening { and variable name
-							// Find the character before 'before'
-							const charBefore = Editor.before(editor, before, {
-								unit: "character",
-							});
-							if (charBefore) {
-								Transforms.delete(editor, {
-									at: {
-										anchor: charBefore,
-										focus: selection.focus,
-									} as Range,
-								});
-
-								// Insert a mention element
-								Transforms.insertNodes(editor, {
-									type: "mention",
-									mentionType: "variable",
-									value: `{${varName}}`,
-									children: [{ text: "" }],
-								});
-
-								if (onMentionEnd) {
-									onMentionEnd();
-								}
-							}
-
-							return;
-						}
-
-						// We no longer need to check for trigger characters at the end
-						// of previous text since we handle them in handleKeyDown
-					}
 				}
+
+				onChange(html);
 			}
 		},
-		[editor, onMentionEnd],
+		[onChange, maxLength],
 	);
 
-	const handleKeyDown = useCallback(
-		(event: React.KeyboardEvent) => {
-			const { selection } = editor;
+	// Memoize rows class calculations
+	const rowsClass = useMemo(() => {
+		if (singleLine) return "";
+		return cn(
+			rows === 3 ? "h-[120px]" : "",
+			rows === 4 ? "h-[150px]" : "",
+			rows === 5 ? "h-[180px]" : "",
+			rows === 6 ? "h-[210px]" : "",
+			rows > 6 ? "h-[240px]" : "",
+		);
+	}, [rows, singleLine]);
 
+	// Memoize editor class names to prevent recalculations
+	const editorClassNames = useMemo(() => {
+		return cn(
+			"w-full rounded-md border border-input bg-background text-sm",
+			singleLine
+				? "h-10 min-h-0 overflow-y-hidden overflow-x-auto"
+				: "max-h-[50vh] overflow-y-auto",
+			!singleLine && rowsClass,
+			singleLine ? "pr-10 pl-3 py-2" : "px-3 py-2",
+			"focus-visible:outline-none focus:ring-1 focus:ring-offset-0 focus-visible:ring-ring",
+			"whitespace-pre-wrap break-words",
+			singleLine ? "resize-none" : "resize-vertical",
+			className,
+		);
+	}, [singleLine, rowsClass, className]);
+
+	// Handle keyboard events - memoized to prevent recreation on each render
+	const handleKeyDown = useCallback(
+		(event: React.KeyboardEvent<HTMLDivElement>) => {
+			// For single line, prevent Enter key from creating new lines
+			if (singleLine && event.key === "Enter" && !event.shiftKey) {
+				event.preventDefault();
+				return;
+			}
+
+			const { selection } = editor;
 			if (!selection) return;
 
 			// Handle specific trigger characters for mentions
 			if (["@", "#", "{"].includes(event.key) && onMentionStart) {
-				// Prevent default to avoid inserting the trigger character
 				event.preventDefault();
 
-				// Get the DOM selection and position
 				const domSelection = window.getSelection();
 				if (domSelection && domSelection.rangeCount > 0) {
 					const range = domSelection.getRangeAt(0);
@@ -555,34 +643,116 @@ export function MentionTextarea({
 					if (event.key === "#") mentionType = "channel";
 					if (event.key === "{") mentionType = "variable";
 
-					// Insert a placeholder element to show where the mention will go
+					// Insert a placeholder element
 					Transforms.insertNodes(editor, {
 						type: "mention-placeholder",
 						mentionType,
 						children: [{ text: "" }],
 					});
 
-					// Call onMentionStart immediately
-					onMentionStart({
+					// Update the mention state
+					setMentionState({
+						active: true,
 						type: mentionType,
 						search: "",
-						domRect: rect,
+					});
+
+					// Use requestAnimationFrame instead of setTimeout for better performance
+					requestAnimationFrame(() => {
+						const updatedSelection = window.getSelection();
+						if (updatedSelection && updatedSelection.rangeCount > 0) {
+							const updatedRange = updatedSelection.getRangeAt(0);
+							const updatedRect = updatedRange.getBoundingClientRect();
+
+							onMentionStart({
+								type: mentionType,
+								search: "",
+								domRect: updatedRect,
+							});
+						} else {
+							onMentionStart({
+								type: mentionType,
+								search: "",
+								domRect: rect,
+							});
+						}
 					});
 				}
 				return;
 			}
 
-			// Handle escape to close popover
+			// Other event handling logic (kept the same as original)
 			if (event.key === "Escape" && onMentionEnd) {
 				event.preventDefault();
+
+				setMentionState({ active: false, type: null, search: "" });
+
+				const [node] = Editor.nodes(editor, {
+					match: (n) =>
+						SlateElement.isElement(n) && n.type === "mention-placeholder",
+				});
+
+				if (node) {
+					Transforms.delete(editor, { at: node[1] });
+				}
+
 				onMentionEnd();
 				return;
 			}
 
 			// Handle space key to close popover when active
-			if (event.key === " " && onMentionEnd) {
+			if (event.key === " " && mentionState.active && onMentionEnd) {
+				setMentionState({ active: false, type: null, search: "" });
+
+				const [node] = Editor.nodes(editor, {
+					match: (n) =>
+						SlateElement.isElement(n) && n.type === "mention-placeholder",
+				});
+
+				if (node) {
+					Transforms.delete(editor, { at: node[1] });
+				}
+
 				onMentionEnd();
-				// Don't prevent default - we want the space to be inserted
+			}
+
+			// Handle backspace to delete characters in the mention search or end the mention
+			if (event.key === "Backspace" && mentionState.active) {
+				if (mentionState.search.length > 0) {
+					const newSearch = mentionState.search.slice(0, -1);
+					setMentionState((prev) => ({ ...prev, search: newSearch }));
+
+					const domSelection = window.getSelection();
+					if (domSelection && domSelection.rangeCount > 0 && onMentionStart) {
+						const range = domSelection.getRangeAt(0);
+						const rect = range.getBoundingClientRect();
+
+						onMentionStart({
+							type: mentionState.type ?? "variable",
+							search: newSearch,
+							domRect: rect,
+						});
+					}
+
+					event.preventDefault();
+					return;
+				}
+
+				if (mentionState.search.length === 0 && onMentionEnd) {
+					setMentionState({ active: false, type: null, search: "" });
+
+					const [node] = Editor.nodes(editor, {
+						match: (n) =>
+							SlateElement.isElement(n) && n.type === "mention-placeholder",
+					});
+
+					if (node) {
+						Transforms.delete(editor, { at: node[1] });
+					}
+
+					onMentionEnd();
+					return;
+				}
 			}
 
 			// Handle arrow key navigation to skip over mention elements
@@ -608,176 +778,62 @@ export function MentionTextarea({
 				}
 			}
 
-			// Handle backspace to delete entire mention elements
-			if (event.key === "Backspace") {
-				if (selection && Range.isCollapsed(selection)) {
-					const prevPath = Editor.before(editor, selection);
-
-					if (prevPath) {
-						const [prevNode, prevNodePath] = Editor.node(editor, prevPath);
-
-						// If previous node is a mention or placeholder, delete it entirely
-						if (
-							SlateElement.isElement(prevNode) &&
-							(prevNode.type === "mention" ||
-								prevNode.type === "mention-placeholder")
-						) {
-							event.preventDefault();
-							Transforms.delete(editor, { at: prevNodePath });
-							return;
-						}
-					}
-				}
+			// If Enter is pressed while a mention is active and there's search text
+			if (
+				event.key === "Enter" &&
+				mentionState.active &&
+				mentionState.search.length > 0
+			) {
+				event.preventDefault();
 			}
 		},
-		[editor, onMentionStart, onMentionEnd],
+		[editor, onMentionStart, onMentionEnd, singleLine, mentionState],
 	);
 
-	// Helper method to insert mentions
-	const insertMention = useCallback(
-		(
-			mentionType: "variable" | "role" | "channel",
-			value: string,
-			cleanup?: () => void,
-		) => {
-			try {
-				let formattedValue = value;
+	// Handle focus/blur events
+	const handleFocus = useCallback(() => {
+		setIsFocused(true);
+		if (onFocus) {
+			onFocus();
+		}
+	}, [onFocus]);
 
-				// Sprawdź czy wartość już zawiera nawiasy/znaczniki i nie dodawaj ich ponownie
-				if (mentionType === "variable" && !value.startsWith("{")) {
-					formattedValue = `{${value}}`;
-				} else if (mentionType === "role" && !value.startsWith("<@")) {
-					formattedValue = `<@${value}>`;
-				} else if (mentionType === "channel" && !value.startsWith("<#")) {
-					formattedValue = `<#${value}>`;
-				}
+	const handleBlur = useCallback(() => {
+		setIsFocused(false);
+		if (onBlur) {
+			onBlur();
+		}
+	}, [onBlur]);
 
-				// Insert at current selection
-				Transforms.insertNodes(editor, {
-					type: "mention",
-					mentionType,
-					value: formattedValue,
-					children: [{ text: "" }],
-				});
-
-				// Insert a space after the mention
-				Transforms.insertText(editor, " ");
-
-				// Ensure the selection point is after the inserted space
-				const currentSelection = editor.selection;
-				if (currentSelection) {
-					// Move point forward to ensure it's after the space
-					const point = {
-						path: currentSelection.focus.path,
-						offset: currentSelection.focus.offset,
-					};
-					Transforms.select(editor, point);
-				}
-
-				// Call the cleanup function if provided
-				if (cleanup && typeof cleanup === "function") {
-					cleanup();
-				}
-
-				// Call the onMentionEnd callback
-				if (onMentionEnd) {
-					onMentionEnd();
-				}
-
-				// Ensure editor is focused
-				setTimeout(() => {
-					ReactEditor.focus(editor);
-				}, 0);
-			} catch (error) {
-				console.error("Error inserting mention:", error);
-			}
-		},
-		[editor, onMentionEnd],
-	);
-
+	// Return component with optimized rendering
 	return (
-		<Slate
-			editor={editor}
-			initialValue={initialValue}
-			onChange={(value) => {
-				const html = serializeToHtml(value);
-				onChange?.(html);
-			}}
+		<div
+			id="mention-textarea"
+			className={cn("relative w-full", singleLine ? "flex items-center" : "")}
+			onFocus={handleFocus}
+			onBlur={handleBlur}
 		>
-			<Editable
-				className={cn(
-					"w-full rounded-md border border-input bg-background text-sm",
-					"min-h-[44px] max-h-[50vh] overflow-y-auto resize-none",
-					"px-3 py-2",
-					"focus-visible:outline-none focus:ring-1 focus:ring-offset-0 focus-visible:ring-ring",
-					"whitespace-pre-wrap break-words",
-					className,
-				)}
-				placeholder={placeholder}
-				renderElement={(props) => <Element {...props} />}
-				onDOMBeforeInput={handleDOMBeforeInput}
-				onKeyDown={handleKeyDown}
-				spellCheck={true}
-				data-testid="mention-textarea"
-			/>
-		</Slate>
+			<Slate
+				editor={editor}
+				initialValue={initialValue}
+				onChange={handleChange}
+			>
+				<Editable
+					id="content-editable"
+					className={editorClassNames}
+					renderElement={(props) => <Element {...props} />}
+					onKeyDown={handleKeyDown}
+					style={style}
+					placeholder={placeholder}
+					autoCorrect="off"
+					spellCheck="true"
+					data-testid="mention-textarea"
+					data-slate-editor
+					data-slate-node="value"
+					contentEditable="true"
+					suppressContentEditableWarning
+				/>
+			</Slate>
+		</div>
 	);
-}
-
-// Expose the insertMention method
-MentionTextarea.insertMention = (
-	editor: BaseEditor & ReactEditor,
-	mentionType: "variable" | "role" | "channel",
-	value: string,
-) => {
-	try {
-		let formattedValue = value;
-
-		// Sprawdź czy wartość już zawiera nawiasy/znaczniki i nie dodawaj ich ponownie
-		if (mentionType === "variable" && !value.startsWith("{")) {
-			formattedValue = `{${value}}`;
-		} else if (mentionType === "role" && !value.startsWith("<@")) {
-			formattedValue = `<@${value}>`;
-		} else if (mentionType === "channel" && !value.startsWith("<#")) {
-			formattedValue = `<#${value}>`;
-		}
-
-		// Insert at current selection
-		Transforms.insertNodes(editor, {
-			type: "mention",
-			mentionType,
-			value: formattedValue,
-			children: [{ text: "" }],
-		});
-
-		// Insert a space after the mention
-		Transforms.insertText(editor, " ");
-
-		// Ensure the selection point is after the inserted space
-		const currentSelection = editor.selection;
-		if (currentSelection) {
-			// Move point forward to ensure it's after the space
-			const point = {
-				path: currentSelection.focus.path,
-				offset: currentSelection.focus.offset,
-			};
-			Transforms.select(editor, point);
-		}
-
-		// Ensure editor is focused
-		setTimeout(() => {
-			ReactEditor.focus(editor);
-		}, 0);
-	} catch (error) {
-		console.error("Error inserting mention:", error);
-	}
-};
-
-// Helper function to get editor instance by id
-MentionTextarea.getEditorInstance = (
-	id: string,
-): (BaseEditor & ReactEditor) | null => {
-	if (typeof window === "undefined") return null;
-	const typedWindow = window as WindowWithEditors;
-	return typedWindow.__slateEditorInstances?.[id] || null;
-};
+});

@@ -1,4 +1,4 @@
-export const emojiCategories = [
+export const emojis = [
 	{
 		name: "Gestures",
 		emojis: [

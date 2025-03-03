@@ -1,17 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
-import { useServerPlugins } from "@/context/plugins-context";
+import React from "react";
 import {
 	Card,
 	CardContent,
 	CardDescription,
-	CardFooter,
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RotateCw } from "lucide-react";
 import type { Plugin } from "@/hooks/use-plugins";
 import { PluginConfigForm } from "@/components/plugins/plugin-config-form";
@@ -21,7 +17,6 @@ export default function PluginConfig({
 	plugin,
 	guildId,
 }: { plugin: Plugin; guildId: string }) {
-	const [currentTab, setCurrentTab] = useState("basic");
 
 	if (!plugin) {
 		return (
@@ -64,22 +59,10 @@ export default function PluginConfig({
 				<Separator />
 
 				<CardContent className="pt-6">
-					<Tabs
-						defaultValue="basic"
-						className="w-full"
-						onValueChange={setCurrentTab}
-					>
-						<TabsList className="mb-4">
-							<TabsTrigger value="basic">Basic</TabsTrigger>
-							<TabsTrigger value="advanced">Advanced</TabsTrigger>
-						</TabsList>
-
-						<PluginConfigForm
-							plugin={plugin}
-							guildId={guildId}
-							type={currentTab as "basic" | "advanced"}
-						/>
-					</Tabs>
+					<PluginConfigForm
+						plugin={plugin}
+						guildId={guildId}
+					/>
 				</CardContent>
 			</Card>
 		</React.Fragment>

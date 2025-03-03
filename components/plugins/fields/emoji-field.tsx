@@ -25,13 +25,13 @@ import {
 	CommandInput,
 	CommandList,
 } from "@/components/ui/command";
-import { emojiCategories } from "@/lib/emojis";
+import { emojis } from "@/lib/emojis";
 
 // Define types for the emoji items
 type EmojiItem = { emoji: string; keywords: string };
 
 // Convert all emojis to objects with consistent structure
-const processedCategories = emojiCategories.map((category) => ({
+const processedCategories = emojis.map((category) => ({
 	name: category.name,
 	emojis: category.emojis.map((item) =>
 		typeof item === "string" ? { emoji: item, keywords: item } : item,
