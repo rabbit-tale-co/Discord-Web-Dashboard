@@ -5,7 +5,15 @@ import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { MentionTextarea } from "@/components/ui/mention";
 import { getCachedData, setCachedData } from "@/lib/cache";
-import { MinusIcon, StarIcon, StarOffIcon } from "lucide-react";
+import {
+	CircleIcon,
+	EllipsisVerticalIcon,
+	SquareIcon,
+	MinusIcon,
+	StarIcon,
+	StarOffIcon,
+	Star,
+} from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import {
 	Dialog,
@@ -20,6 +28,19 @@ import {
 	DrawerTitle,
 	DrawerTrigger,
 } from "@/components/ui/drawer";
+import {
+	DropdownMenu,
+	DropdownMenuItem,
+	DropdownMenuContent,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+	Select,
+	SelectItem,
+	SelectContent,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 
 type ColorMode = "hsl" | "rgb";
 
@@ -495,241 +516,6 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
 		}
 	};
 
-	const ColorPickerContent = () => (
-		<div className="space-y-4">
-			<div className="relative">
-				<canvas
-					ref={canvasRef}
-					width={200}
-					height={200}
-					className="w-full h-48 rounded-[10px] cursor-crosshair"
-					onMouseDown={handleCanvasMouseDown}
-					onMouseMove={handleCanvasMouseMove}
-					onMouseUp={handleCanvasMouseUp}
-					onMouseLeave={handleCanvasMouseUp}
-				/>
-
-				<div className="p-2 space-y-4">
-					<div
-						className="w-full mt-1 h-1.5 rounded-full relative"
-						style={{
-							background: `linear-gradient(to right,
-								hsl(0, 100%, 50%),
-								hsl(60, 100%, 50%),
-								hsl(120, 100%, 50%),
-								hsl(180, 100%, 50%),
-								hsl(240, 100%, 50%),
-								hsl(300, 100%, 50%),
-								hsl(360, 100%, 50%))`,
-						}}
-					>
-						<Slider
-							value={[hue]}
-							min={0}
-							max={360}
-							step={1}
-							onValueChange={handleHueChange}
-							className="absolute inset-0 opacity-0 cursor-pointer"
-							aria-label="Hue slider"
-						/>
-						<div
-							className="absolute size-5 rounded-full border-2 border-white transform -translate-x-1/2 -translate-y-1/2 pointer-events-none shadow-sm"
-							style={{
-								backgroundColor: `hsl(${hue}, 100%, 50%)`,
-								left: `${(hue / 360) * 100}%`,
-								top: "50%",
-							}}
-						/>
-					</div>
-
-					{/* Color mode selector */}
-					<div className="flex gap-2 [&>button]:w-full">
-						<Button
-							size="sm"
-							variant={colorMode === "hsl" ? "default" : "outline"}
-							onClick={() => handleColorModeChange("hsl")}
-						>
-							HSL
-						</Button>
-						<Button
-							size="sm"
-							variant={colorMode === "rgb" ? "default" : "outline"}
-							onClick={() => handleColorModeChange("rgb")}
-						>
-							RGB
-						</Button>
-					</div>
-
-					{/* Color values display */}
-					<div className="grid grid-cols-4 gap-1 text-center [&>div]:bg-gray-100 [&>div]:px-2.5 [&>div]:py-1.5 [&>div]:rounded-md [&>div]:text-xs [&>span]:text-xs">
-						<div>{customColor}</div>
-						{colorMode === "hsl" && (
-							<React.Fragment>
-								<div>{Math.round(hue)}</div>
-								<div>{Math.round(saturation)}</div>
-								<div>{Math.round(lightness)}</div>
-								<span>Hex</span>
-								<span>H</span>
-								<span>S</span>
-								<span>L</span>
-							</React.Fragment>
-						)}
-						{colorMode === "rgb" && (
-							<React.Fragment>
-								<div>{rgbValues.r}</div>
-								<div>{rgbValues.g}</div>
-								<div>{rgbValues.b}</div>
-								<span>Hex</span>
-								<span>R</span>
-								<span>G</span>
-								<span>B</span>
-							</React.Fragment>
-						)}
-					</div>
-
-					<div className="flex items-center gap-2">
-						<MentionTextarea
-							value={customColor}
-							onChange={handleCustomColorChange}
-							className="min-w-0 flex-1"
-							singleLine
-							showSuggestions={false}
-							showEmojiPicker={false}
-						/>
-						<div className="flex items-center gap-1 flex-shrink-0">
-							<Button
-								variant="ghost"
-								size="iconLg"
-								onClick={() => toggleFavoriteColor(customColor)}
-								className={cn(
-									isFavoriteColor(customColor) &&
-										"text-yellow-400 bg-yellow-400/20 hover:bg-yellow-400/30 hover:text-yellow-800",
-								)}
-							>
-								<StarIcon className="size-5" />
-							</Button>
-							<Button
-								onClick={applyCustomColor}
-								className="bg-black text-white hover:bg-gray-800 px-4"
-							>
-								Apply
-							</Button>
-						</div>
-					</div>
-
-					{favoriteColors.length > 0 && (
-						<div className="space-y-2">
-							<div className="text-xs font-medium">Favorites</div>
-							<div className="grid grid-cols-6 gap-1">
-								{favoriteColors.map((color) => (
-									<div key={color} className="group relative">
-										<div
-											className="w-full pb-[100%] rounded-md cursor-pointer"
-											style={{ backgroundColor: color }}
-											onClick={() => {
-												setCustomColor(color);
-												const colorValue = hexToNumber(color);
-												onChange(colorValue);
-												const { h, s, l } = hexToHsl(color);
-												setHue(h);
-												setSaturation(s);
-												setLightness(l);
-											}}
-											onKeyDown={(e) => {
-												if (e.key === "Enter" || e.key === " ") {
-													setCustomColor(color);
-													const colorValue = hexToNumber(color);
-													onChange(colorValue);
-													const { h, s, l } = hexToHsl(color);
-													setHue(h);
-													setSaturation(s);
-													setLightness(l);
-												}
-											}}
-											role="button"
-											tabIndex={0}
-										/>
-										<Button
-											variant="ghost"
-											size="icon"
-											onClick={() => toggleFavoriteColor(color)}
-											className={cn(
-												"absolute top-1 right-1 size-5 opacity-0 bg-primary/20 group-hover:opacity-100",
-												isFavoriteColor(color) &&
-													"opacity-100 text-primary-foreground",
-											)}
-										>
-											<StarOffIcon className="size-3" />
-										</Button>
-									</div>
-								))}
-							</div>
-						</div>
-					)}
-
-					<div className="space-y-2">
-						<div className="text-xs font-medium">History</div>
-						<div className="grid grid-cols-6 gap-1">
-							{colorHistory.map((color) => (
-								<div key={color} className="group relative">
-									<div
-										className="w-full pb-[100%] rounded-md cursor-pointer"
-										style={{ backgroundColor: color }}
-										onClick={() => {
-											setCustomColor(color);
-											const colorValue = hexToNumber(color);
-											onChange(colorValue);
-											const { h, s, l } = hexToHsl(color);
-											setHue(h);
-											setSaturation(s);
-											setLightness(l);
-										}}
-										onKeyDown={(e) => {
-											if (e.key === "Enter" || e.key === " ") {
-												setCustomColor(color);
-												const colorValue = hexToNumber(color);
-												onChange(colorValue);
-												const { h, s, l } = hexToHsl(color);
-												setHue(h);
-												setSaturation(s);
-												setLightness(l);
-											}
-										}}
-										role="button"
-										tabIndex={0}
-									/>
-									<Button
-										variant="ghost"
-										size="icon"
-										onClick={() => toggleFavoriteColor(color)}
-										className={cn(
-											"absolute top-1 right-1 size-5 opacity-0 bg-primary/20 group-hover:opacity-100",
-											isFavoriteColor(color) &&
-												"opacity-100 text-primary-foreground",
-										)}
-									>
-										<StarIcon className="size-3" />
-									</Button>
-								</div>
-							))}
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	);
-
-	const triggerButton = (
-		<Button
-			variant="outline"
-			className="size-6 p-0 rounded-sm border"
-			style={{
-				backgroundColor: customColor,
-				borderColor: "transparent",
-			}}
-		/>
-	);
-
 	const content = (
 		<div className={cn("space-y-2", className)}>
 			<div className="flex flex-wrap gap-2">
@@ -743,10 +529,218 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
 							}
 						}}
 					>
-						<DialogTrigger asChild>{triggerButton}</DialogTrigger>
-						<DialogContent className="sm:max-w-[425px]">
+						<DialogTrigger asChild>
+							<Button
+								variant="outline"
+								className="size-6 p-0 rounded-sm border"
+								style={{
+									backgroundColor: customColor,
+									borderColor: "transparent",
+								}}
+							/>
+						</DialogTrigger>
+						<DialogContent className="sm:max-w-[350px] rounded-2xl p-4">
 							<DialogTitle>Color Picker</DialogTitle>
-							<ColorPickerContent />
+							<div className="space-y-4">
+								<div className="relative">
+									<canvas
+										ref={canvasRef}
+										width={200}
+										height={200}
+										className="w-full h-48 rounded-[10px] cursor-crosshair"
+										onMouseDown={handleCanvasMouseDown}
+										onMouseMove={handleCanvasMouseMove}
+										onMouseUp={handleCanvasMouseUp}
+										onMouseLeave={handleCanvasMouseUp}
+									/>
+
+									<div className="mt-4 space-y-4">
+										<div className="flex items-center gap-3">
+											<div
+												className="w-full h-1.5 rounded-full relative"
+												style={{
+													background: `linear-gradient(to right,
+													hsl(0, 100%, 50%),
+													hsl(60, 100%, 50%),
+													hsl(120, 100%, 50%),
+													hsl(180, 100%, 50%),
+													hsl(240, 100%, 50%),
+													hsl(300, 100%, 50%),
+													hsl(360, 100%, 50%))`,
+												}}
+											>
+												<Slider
+													value={[hue]}
+													min={0}
+													max={360}
+													step={1}
+													onValueChange={handleHueChange}
+													className="absolute inset-0 opacity-0 cursor-pointer"
+													aria-label="Hue slider"
+												/>
+												<div
+													className="absolute size-5 rounded-full border-2 border-primary/50 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none shadow-sm"
+													style={{
+														backgroundColor: `hsl(${hue}, 100%, 50%)`,
+														left: `${(hue / 360) * 100}%`,
+														top: "50%",
+													}}
+												/>
+											</div>
+										</div>
+
+										{/* Color values display */}
+										<div className="grid grid-cols-4 gap-3 text-center [&>button]:bg-gray-100 [&>button]:rounded-md [&>button]:px-2.5 [&>button]:cursor-default [&>button]:text-default">
+											<Select onValueChange={handleColorModeChange}>
+												<SelectTrigger className="uppercase">
+													<SelectValue placeholder={colorMode} />
+												</SelectTrigger>
+												<SelectContent>
+													<SelectItem value="hsl">HSL</SelectItem>
+													<SelectItem value="rgb">RGB</SelectItem>
+												</SelectContent>
+											</Select>
+											{colorMode === "hsl" && (
+												<React.Fragment>
+													<Button variant="secondary">H: {Math.round(hue)}</Button>
+													<Button variant="secondary">S: {Math.round(saturation)}</Button>
+													<Button variant="secondary">L: {Math.round(lightness)}</Button>
+												</React.Fragment>
+											)}
+											{colorMode === "rgb" && (
+												<React.Fragment>
+													<Button variant="secondary">R: {rgbValues.r}</Button>
+													<Button variant="secondary">G: {rgbValues.g}</Button>
+													<Button variant="secondary">B: {rgbValues.b}</Button>
+												</React.Fragment>
+											)}
+										</div>
+
+										<div className="flex items-center gap-3">
+											<MentionTextarea
+												value={customColor}
+												onChange={handleCustomColorChange}
+												className="min-w-0 flex-1 uppercase"
+												singleLine
+												showSuggestions={false}
+												showEmojiPicker={false}
+											/>
+											<div className="flex items-center gap-3 flex-shrink-0">
+												<Button
+													variant="outline"
+													size="iconLg"
+													onClick={() => toggleFavoriteColor(customColor)}
+													className="text-primary/50 hover:text-primary"
+												>
+													{isFavoriteColor(customColor) ? (
+														<StarOffIcon className="size-5 fill-current" />
+													) : (
+														<StarIcon className="size-5 fill-current" />
+													)}
+												</Button>
+												<Button
+													size="lg"
+													onClick={applyCustomColor}
+													className="bg-black text-white hover:bg-gray-800 px-4"
+												>
+													Apply
+												</Button>
+											</div>
+										</div>
+
+										{/* Recent Colors */}
+										<div className="space-y-2">
+											<h4 className="text-sm font-medium">Recent</h4>
+											<div className="grid grid-cols-8 gap-2">
+												{colorHistory.map((color) => (
+													<div key={color} className="group relative">
+														<div
+															className="w-full pb-[100%] rounded-md cursor-pointer"
+															style={{ backgroundColor: color }}
+															onClick={() => {
+																setCustomColor(color);
+																const colorValue = hexToNumber(color);
+																onChange(colorValue);
+																const { h, s, l } = hexToHsl(color);
+																setHue(h);
+																setSaturation(s);
+																setLightness(l);
+															}}
+															onKeyDown={(e) => {
+																if (e.key === "Enter" || e.key === " ") {
+																	setCustomColor(color);
+																	const colorValue = hexToNumber(color);
+																	onChange(colorValue);
+																	const { h, s, l } = hexToHsl(color);
+																	setHue(h);
+																	setSaturation(s);
+																	setLightness(l);
+																}
+															}}
+															role="button"
+															tabIndex={0}
+														/>
+													</div>
+												))}
+											</div>
+										</div>
+
+										{favoriteColors.length > 0 && (
+											<div className="space-y-2">
+												<h4 className="text-sm font-medium">Saved colors</h4>
+												<div className="grid grid-cols-8 gap-2">
+													{favoriteColors.map((color) => (
+														<div key={color} className="group relative">
+															<div
+																className={cn(
+																	"w-full pb-[100%] rounded-md cursor-pointer relative ring-offset-background transition-all",
+																	color === customColor &&
+																		"ring-2 ring-primary ring-offset-3",
+																)}
+																style={{ backgroundColor: color }}
+																onClick={() => {
+																	setCustomColor(color);
+																	const colorValue = hexToNumber(color);
+																	onChange(colorValue);
+																	const { h, s, l } = hexToHsl(color);
+																	setHue(h);
+																	setSaturation(s);
+																	setLightness(l);
+																}}
+																onKeyDown={(e) => {
+																	if (e.key === "Enter" || e.key === " ") {
+																		setCustomColor(color);
+																		const colorValue = hexToNumber(color);
+																		onChange(colorValue);
+																		const { h, s, l } = hexToHsl(color);
+																		setHue(h);
+																		setSaturation(s);
+																		setLightness(l);
+																	}
+																}}
+																role="button"
+																tabIndex={0}
+															>
+																<Button
+																	variant="ghost"
+																	size="icon"
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		toggleFavoriteColor(color);
+																	}}
+																	className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center hover:bg-transparent pointer-events-none"
+																>
+																	<StarIcon className="size-4 fill-current text-white/50" />
+																</Button>
+															</div>
+														</div>
+													))}
+												</div>
+											</div>
+										)}
+									</div>
+								</div>
+							</div>
 						</DialogContent>
 					</Dialog>
 				) : (
@@ -759,13 +753,221 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
 							}
 						}}
 					>
-						<DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
+						<DrawerTrigger asChild>
+							<Button
+								variant="outline"
+								className="size-6 p-0 rounded-sm border"
+								style={{
+									backgroundColor: customColor,
+									borderColor: "transparent",
+								}}
+							/>
+						</DrawerTrigger>
 						<DrawerContent>
 							<DrawerHeader>
 								<DrawerTitle>Color Picker</DrawerTitle>
 							</DrawerHeader>
 							<div className="px-4 pb-4">
-								<ColorPickerContent />
+								<div className="space-y-4">
+									<div className="relative">
+										<canvas
+											ref={canvasRef}
+											width={200}
+											height={200}
+											className="w-full h-48 rounded-[10px] cursor-crosshair"
+											onMouseDown={handleCanvasMouseDown}
+											onMouseMove={handleCanvasMouseMove}
+											onMouseUp={handleCanvasMouseUp}
+											onMouseLeave={handleCanvasMouseUp}
+										/>
+
+										<div className="mt-4 space-y-4">
+											<div className="flex items-center gap-3">
+												<div
+													className="w-full h-1.5 rounded-full relative"
+													style={{
+														background: `linear-gradient(to right,
+														hsl(0, 100%, 50%),
+														hsl(60, 100%, 50%),
+														hsl(120, 100%, 50%),
+														hsl(180, 100%, 50%),
+														hsl(240, 100%, 50%),
+														hsl(300, 100%, 50%),
+														hsl(360, 100%, 50%))`,
+													}}
+												>
+													<Slider
+														value={[hue]}
+														min={0}
+														max={360}
+														step={1}
+														onValueChange={handleHueChange}
+														className="absolute inset-0 opacity-0 cursor-pointer"
+														aria-label="Hue slider"
+													/>
+													<div
+														className="absolute size-5 rounded-full border-2 border-primary/50 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none shadow-sm"
+														style={{
+															backgroundColor: `hsl(${hue}, 100%, 50%)`,
+															left: `${(hue / 360) * 100}%`,
+															top: "50%",
+														}}
+													/>
+												</div>
+											</div>
+
+											{/* Color values display */}
+											<div className="grid grid-cols-4 gap-3 text-center [&>button]:bg-gray-100 [&>button]:rounded-md [&>button]:px-2.5 [&>button]:cursor-default [&>button]:text-default">
+												<Select onValueChange={handleColorModeChange}>
+													<SelectTrigger className="uppercase">
+														<SelectValue placeholder={colorMode} />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value="hsl">HSL</SelectItem>
+														<SelectItem value="rgb">RGB</SelectItem>
+													</SelectContent>
+												</Select>
+												{colorMode === "hsl" && (
+													<React.Fragment>
+														<Button variant="secondary">H: {Math.round(hue)}</Button>
+														<Button variant="secondary">S: {Math.round(saturation)}</Button>
+														<Button variant="secondary">L: {Math.round(lightness)}</Button>
+													</React.Fragment>
+												)}
+												{colorMode === "rgb" && (
+													<React.Fragment>
+														<Button variant="secondary">R: {rgbValues.r}</Button>
+														<Button variant="secondary">G: {rgbValues.g}</Button>
+														<Button variant="secondary">B: {rgbValues.b}</Button>
+													</React.Fragment>
+												)}
+											</div>
+
+											<div className="flex items-center gap-3">
+												<MentionTextarea
+													value={customColor}
+													onChange={handleCustomColorChange}
+													className="min-w-0 flex-1 uppercase"
+													singleLine
+													showSuggestions={false}
+													showEmojiPicker={false}
+												/>
+												<div className="flex items-center gap-3 flex-shrink-0">
+													<Button
+														variant="outline"
+														size="iconLg"
+														onClick={() => toggleFavoriteColor(customColor)}
+														className="text-primary/50 hover:text-primary"
+													>
+														{isFavoriteColor(customColor) ? (
+															<StarOffIcon className="size-5 fill-current" />
+														) : (
+															<StarIcon className="size-5 fill-current" />
+														)}
+													</Button>
+													<Button
+														size="lg"
+														onClick={applyCustomColor}
+														className="bg-black text-white hover:bg-gray-800 px-4"
+													>
+														Apply
+													</Button>
+												</div>
+											</div>
+
+											{/* Recent Colors */}
+											<div className="space-y-2">
+												<h4 className="text-sm font-medium">Recent</h4>
+												<div className="grid grid-cols-8 gap-2">
+													{colorHistory.map((color) => (
+														<div key={color} className="group relative">
+															<div
+																className="w-full pb-[100%] rounded-md cursor-pointer"
+																style={{ backgroundColor: color }}
+																onClick={() => {
+																	setCustomColor(color);
+																	const colorValue = hexToNumber(color);
+																	onChange(colorValue);
+																	const { h, s, l } = hexToHsl(color);
+																	setHue(h);
+																	setSaturation(s);
+																	setLightness(l);
+																}}
+																onKeyDown={(e) => {
+																	if (e.key === "Enter" || e.key === " ") {
+																		setCustomColor(color);
+																		const colorValue = hexToNumber(color);
+																		onChange(colorValue);
+																		const { h, s, l } = hexToHsl(color);
+																		setHue(h);
+																		setSaturation(s);
+																		setLightness(l);
+																	}
+																}}
+																role="button"
+																tabIndex={0}
+															/>
+														</div>
+													))}
+												</div>
+											</div>
+
+											{favoriteColors.length > 0 && (
+												<div className="space-y-2">
+													<h4 className="text-sm font-medium">Saved colors</h4>
+													<div className="grid grid-cols-8 gap-2">
+														{favoriteColors.map((color) => (
+															<div key={color} className="group relative">
+																<div
+																	className={cn(
+																		"w-full pb-[100%] rounded-md cursor-pointer relative ring-offset-background transition-all",
+																		color === customColor &&
+																			"ring-2 ring-primary ring-offset-3",
+																	)}
+																	style={{ backgroundColor: color }}
+																	onClick={() => {
+																		setCustomColor(color);
+																		const colorValue = hexToNumber(color);
+																		onChange(colorValue);
+																		const { h, s, l } = hexToHsl(color);
+																		setHue(h);
+																		setSaturation(s);
+																		setLightness(l);
+																	}}
+																	onKeyDown={(e) => {
+																		if (e.key === "Enter" || e.key === " ") {
+																			setCustomColor(color);
+																			const colorValue = hexToNumber(color);
+																			onChange(colorValue);
+																			const { h, s, l } = hexToHsl(color);
+																			setHue(h);
+																			setSaturation(s);
+																			setLightness(l);
+																		}
+																	}}
+																	role="button"
+																	tabIndex={0}
+																>
+																	<Button
+																		variant="ghost"
+																		size="icon"
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			toggleFavoriteColor(color);
+																		}}
+																		className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center hover:bg-transparent pointer-events-none"
+																	>
+																		<StarIcon className="size-4 fill-current text-white/50" />
+																	</Button>
+																</div>
+															</div>
+														))}
+													</div>
+												</div>
+											)}
+										</div>
+									</div>
+								</div>
 							</div>
 						</DrawerContent>
 					</Drawer>
