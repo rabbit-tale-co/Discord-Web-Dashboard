@@ -88,15 +88,6 @@ export function ChannelField({
 		return null;
 	}
 
-	// if (status === "loading") {
-	// 	return (
-	// 		<div className="space-y-2">
-	// 			<Skeleton className="h-4 w-[100px]" />
-	// 			<Skeleton className="h-10 w-full" />
-	// 		</div>
-	// 	);
-	// }
-
 	return (
 		<FormField
 			control={form.control}

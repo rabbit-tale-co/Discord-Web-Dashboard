@@ -3,28 +3,73 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useServerPlugins } from "@/context/plugins-context";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardFooter,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import type { Plugin } from "@/hooks/use-plugins";
-import Config from "@/components/dashbaord/plugins/config";
+import type {
+	PluginTypes,
+	Level,
+	Ticket,
+	WelcomeGoodbye,
+} from "@/hooks/use-plugins";
+import { Config } from "@/components/dashbaord/plugins/config";
+
+// Define a union type for all possible plugin types
+type SpecificPlugin = Level | Ticket | WelcomeGoodbye; // Add other plugin types as needed
+
+// Define a type for a single plugin
+type Plugin = {
+	id: string;
+};
+
+// Function to get the specific plugin based on pluginId
+function getSpecificPlugin(
+	pluginId: string,
+	plugins: PluginTypes,
+): SpecificPlugin | null {
+	switch (pluginId) {
+		case "levels":
+			return plugins.levels;
+		case "tickets":
+			return plugins.tickets;
+		case "welcome_goodbye":
+			return plugins.welcome_goodbye;
+		// Add cases for other plugin types as needed
+		default:
+			return null;
+	}
+}
+
+// Function to map plugins to PluginTypes
+function mapPluginsToPluginTypes(plugins: Plugin[]): PluginTypes {
+	const pluginTypes: Partial<PluginTypes> = {};
+
+	for (const plugin of plugins) {
+		switch (plugin.id) {
+			case "levels":
+				pluginTypes.levels = plugin as unknown as Level;
+				break;
+			case "tickets":
+				pluginTypes.tickets = plugin as unknown as Ticket;
+				break;
+			case "welcome_goodbye":
+				pluginTypes.welcome_goodbye = plugin as unknown as WelcomeGoodbye;
+				break;
+			// Add cases for other plugin types as needed
+		}
+	}
+
+	return pluginTypes as PluginTypes;
+}
 
 export default function PluginPage() {
 	const params = useParams();
 	const guildId = params.id as string;
 	const pluginId = params.pluginId as string;
 	const { pluginsData, refetchPlugins, lastUpdated } = useServerPlugins();
-	const [plugin, setPlugin] = useState<Plugin | null>(null);
+	const [plugin, setPlugin] = useState<SpecificPlugin | null>(null);
 	const [status, setStatus] = useState<"loading" | "error" | "success">(
 		"loading",
 	);
@@ -33,11 +78,12 @@ export default function PluginPage() {
 
 	// Pobierz dane pluginu na podstawie ID
 	useEffect(() => {
-		if (pluginsData && pluginsData.length > 0) {
-			const foundPlugin = pluginsData.find((p) => p.id === pluginId);
-			if (foundPlugin) {
-				setPlugin(foundPlugin);
-				setStatus(foundPlugin.enabled ? "success" : "error");
+		if (Array.isArray(pluginsData)) {
+			const pluginTypes = mapPluginsToPluginTypes(pluginsData);
+			const specificPlugin = getSpecificPlugin(pluginId, pluginTypes);
+			if (specificPlugin) {
+				setPlugin(specificPlugin);
+				setStatus(specificPlugin.enabled ? "success" : "error");
 			}
 		}
 	}, [pluginsData, pluginId]);
@@ -149,98 +195,101 @@ export default function PluginPage() {
 		}
 	};
 
+	const name = {
+		levels: "Levels",
+		tickets: "Tickets",
+		welcome_goodbye: "Welcome & Goodbye",
+	};
+
+	const date = new Date(lastUpdated);
+	const formattedDate = date.toLocaleString("en-US", {
+		year: "numeric",
+		month: "long",
+		day: "numeric",
+		hour: "numeric",
+		minute: "numeric",
+	});
 	return (
-		<main className="container mx-auto py-3 px-4 sm:px-6 sm:py-6">
-			<div className="mt-3 sm:mt-6 space-y-4">
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-4">
-						<h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-							Dashboard
-						</h2>
-					</div>
-					{/* <Button
-						onClick={handleSave}
-						disabled={isSaving}
-						size={"lg"}
-						type={"submit"}
-					>
-						{isSaving ? "Saving..." : "Save changes"}
-					</Button> */}
+		<div className="container mx-auto space-y-6 p-4 sm:p-6 pb-8">
+			<div className="flex items-center justify-between">
+				<div className="flex items-center gap-4">
+					<h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+						Dashboard
+					</h2>
 				</div>
-				<div className="mb-6">
-					<Link
-						href={`/dashboard/${guildId}`}
-						className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-					>
-						<ArrowLeft className="mr-2 size-4" />
-						Back to dashboard
-					</Link>
-				</div>
-
-				{plugin ? (
-					<React.Fragment
-						key={`plugin-${plugin.id}-${plugin.enabled}-${lastUpdated}`}
-					>
-						<Card className="py-6">
-							<CardHeader>
-								<div className="flex items-center justify-between">
-									<CardTitle className="text-2xl">
-										{String(plugin.name || plugin.id)}
-									</CardTitle>
-									{status === "loading" ? (
-										<Badge variant="outline">Pending</Badge>
-									) : (
-										<Badge
-											variant={
-												plugin.enabled && status === "success"
-													? "default"
-													: "destructive"
-											}
-										>
-											{plugin.enabled ? "Active" : "Inactive"}
-										</Badge>
-									)}
-								</div>
-							</CardHeader>
-
-							<CardContent>
-								<div className="space-y-6">
-									<div className="flex items-center justify-between">
-										<div>
-											<h3 className="font-medium">Plugin status</h3>
-											<p className="text-sm text-muted-foreground">
-												Enable or disable this plugin
-											</p>
-										</div>
-										<div className="flex items-center gap-2">
-											<Switch
-												checked={plugin.enabled}
-												onCheckedChange={() => {
-													handleSave();
-												}}
-												className={`${status === "loading" ? "cursor-not-allowed" : "cursor-pointer"}`}
-												disabled={status === "loading"}
-											/>
-										</div>
-									</div>
-
-									{/* Tutaj można dodać więcej ustawień specyficznych dla danego pluginu */}
-								</div>
-							</CardContent>
-
-							<CardFooter className="flex justify-end">
-								{/* Save button removed since we now save automatically on toggle */}
-							</CardFooter>
-						</Card>
-
-						<Config plugin={plugin} guildId={guildId} />
-					</React.Fragment>
-				) : (
-					<div className="flex items-center justify-center h-full">
-						<p className="text-muted-foreground">Plugin not found</p>
-					</div>
-				)}
 			</div>
-		</main>
+			<div>
+				<Link
+					href={`/dashboard/${guildId}`}
+					className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+				>
+					<ArrowLeft className="mr-2 size-4" />
+					Back to dashboard
+				</Link>
+			</div>
+
+			{plugin ? (
+				<React.Fragment
+					key={`plugin-${pluginId}-${plugin.enabled}-${lastUpdated}`}
+				>
+					<div className="space-y-6">
+						<div className="flex items-center justify-between ">
+							<div>
+								<h2 className="text-2xl font-semibold">
+									{name[pluginId as keyof typeof name]}
+								</h2>
+								<p className="text-sm text-muted-foreground">
+									Customize the configuration of the{" "}
+									{name[pluginId as keyof typeof name]} plugin for your server.
+								</p>
+							</div>
+							{status === "loading" ? (
+								<Badge variant="outline">Pending</Badge>
+							) : (
+								<Badge
+									variant={
+										plugin.enabled && status === "success"
+											? "default"
+											: "destructive"
+									}
+								>
+									{plugin.enabled ? "Active" : "Inactive"}
+								</Badge>
+							)}
+						</div>
+
+						<div className="space-y-6">
+							{/* <div className="flex items-center justify-between">
+								<div>
+									<h3 className="font-medium">
+										Enable {name[pluginId as keyof typeof name]}
+									</h3>
+									<p className="text-sm text-muted-foreground">
+										Activate the {name[pluginId as keyof typeof name]} plugin in
+										your server
+									</p>
+								</div>
+								<div className="flex items-center gap-2">
+									<Switch
+										checked={plugin.enabled}
+										onCheckedChange={() => {
+											handleSave();
+										}}
+										className={`${status === "loading" ? "cursor-not-allowed" : "cursor-pointer"}`}
+										disabled={status === "loading"}
+									/>
+								</div>
+							</div> */}
+
+							<Config plugin={plugin} />
+						</div>
+					</div>
+				</React.Fragment>
+			) : (
+				<div className="flex items-center justify-center h-[50vh]">
+					<p className="text-muted-foreground">Plugin not found</p>
+				</div>
+			)}
+		</div>
 	);
 }

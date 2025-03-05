@@ -1,66 +1,54 @@
+/**
+ * MentionTextareaBase Component
+ *
+ * Core functionality for the mention-enabled text editor.
+ * This component handles the basic Slate editor setup and core functionality
+ * without the specific plugin implementation details.
+ */
+
 import type React from "react";
-import {
-	useCallback,
-	useMemo,
-	useState,
-	useEffect,
-	memo,
-	forwardRef,
-} from "react";
+import { useCallback, useMemo, useState, useEffect, memo } from "react";
 import type { BaseEditor, Descendant } from "slate";
-import type { Node as SlateNode } from "slate";
 import {
 	createEditor,
 	Transforms,
 	Text,
 	Element as SlateElement,
 	Editor,
-	Range,
 } from "slate";
 import { Slate, Editable, withReact } from "slate-react";
 import type { ReactEditor } from "slate-react";
 import { withHistory } from "slate-history";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from "@/components/ui/command";
-import { SmileIcon } from "lucide-react";
 
-// Deklaracja globalna dla rozszerzenia Window
+// Types
+
+// Window with slate editor instances
 interface WindowWithEditors extends Window {
 	__slateEditorInstances?: Record<string, BaseEditor & ReactEditor>;
 }
 
-// Add interface for extended Window with guild data
-interface WindowWithGuildData extends Window {
-	__guildData?: {
-		roles?: Array<{ id: string; name: string }>;
-		channels?: Array<{ id: string; name: string }>;
-	};
+// Define types for guild data but don't extend Window
+interface GuildData {
+	id: string;
+	name: string;
+	roles: Array<{ id: string; name: string; color: number }>;
+	channels: Array<{ id: string; name: string; type: number }>;
 }
 
-// Define custom types for Slate
-type MentionElement = {
+// Define custom element types
+export type MentionType = "variable" | "role" | "channel";
+
+export type MentionElement = {
 	type: "mention";
-	mentionType: "variable" | "role" | "channel";
+	mentionType: MentionType;
 	children: [{ text: "" }]; // void elements have empty text children
 	value: string;
 };
 
-type MentionPlaceholderElement = {
+export type MentionPlaceholderElement = {
 	type: "mention-placeholder";
-	mentionType: "variable" | "role" | "channel";
+	mentionType: MentionType;
 	children: [{ text: "" }];
 };
 
@@ -73,7 +61,7 @@ type CustomText = {
 	text: string;
 };
 
-type CustomElement =
+export type CustomElement =
 	| ParagraphElement
 	| MentionElement
 	| MentionPlaceholderElement;
@@ -86,7 +74,8 @@ declare module "slate" {
 	}
 }
 
-interface MentionTextareaProps {
+// Props
+export interface MentionTextareaBaseProps {
 	placeholder?: string;
 	onChange?: (value: string) => void;
 	value?: string;
@@ -95,49 +84,37 @@ interface MentionTextareaProps {
 	style?: React.CSSProperties;
 	singleLine?: boolean;
 	rows?: number;
-	showEmojiPicker?: boolean;
-	guildId?: string;
 	onMentionStart?: (data: {
-		type: "variable" | "role" | "channel";
+		type: MentionType;
 		search: string;
 		domRect: DOMRect;
 	}) => void;
 	onMentionEnd?: () => void;
 	onFocus?: () => void;
-	onBlur?: () => void;
+	onBlur?: (e: React.FocusEvent<HTMLElement>) => void;
 }
 
-export function Textarea({
-	className,
-	...props
-}: React.ComponentProps<"textarea">) {
-	return (
-		<textarea
-			data-slot="textarea"
-			className={cn(
-				"border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex field-sizing-content min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-				className,
-			)}
-			{...props}
-		/>
-	);
-}
-
-// Empty value constant - memoize this at module level to avoid recreation
+// Empty value constant
 const EMPTY_VALUE: ParagraphElement[] = [
 	{ type: "paragraph", children: [{ text: "" }] },
 ];
 
-// Cache for deserialized HTML values to avoid expensive parsing operations
+// Cache for deserialized HTML values
 const deserializationCache = new Map<string, ParagraphElement[]>();
 
+// Window with guild data
+interface WindowWithGuildData extends Window {
+	__guildData?: GuildData;
+}
+
 // Function to get role name from ID
-const getRoleNameFromId = (roleId: string): string => {
+export const getRoleNameFromId = (roleId: string): string => {
 	try {
 		if (typeof window !== "undefined") {
 			const typedWindow = window as WindowWithGuildData;
-			if (typedWindow.__guildData?.roles) {
-				const role = typedWindow.__guildData.roles.find((r) => r.id === roleId);
+			const guildData = typedWindow.__guildData;
+			if (guildData?.roles) {
+				const role = guildData.roles.find((r) => r.id === roleId);
 				if (role) {
 					return role.name;
 				}
@@ -146,18 +123,17 @@ const getRoleNameFromId = (roleId: string): string => {
 	} catch (e) {
 		console.error("Error getting role name:", e);
 	}
-	return "unknown-role";
+	return roleId;
 };
 
 // Function to get channel name from ID
-const getChannelNameFromId = (channelId: string): string => {
+export const getChannelNameFromId = (channelId: string): string => {
 	try {
 		if (typeof window !== "undefined") {
 			const typedWindow = window as WindowWithGuildData;
-			if (typedWindow.__guildData?.channels) {
-				const channel = typedWindow.__guildData.channels.find(
-					(c) => c.id === channelId,
-				);
+			const guildData = typedWindow.__guildData;
+			if (guildData?.channels) {
+				const channel = guildData.channels.find((c) => c.id === channelId);
 				if (channel) {
 					return channel.name;
 				}
@@ -166,59 +142,40 @@ const getChannelNameFromId = (channelId: string): string => {
 	} catch (e) {
 		console.error("Error getting channel name:", e);
 	}
-	return "unknown-channel";
+	return channelId;
 };
 
-// Define a version of serializeToHtml that's optimized and memoized by input
-// This helps avoid recomputing the same HTML strings repeatedly
-const serializeToHtmlMemoized = (() => {
-	const cache = new Map<string, string>();
-	let lastInput: Descendant[] = [];
-	let lastOutput = "";
+// Serialize content to HTML
+export const serializeToHtml = (nodes: Descendant[]): string => {
+	return nodes
+		.map((node) => {
+			if (Text.isText(node)) {
+				return node.text;
+			}
 
-	return (nodes: Descendant[]): string => {
-		// For small inputs, simple reference check is enough
-		if (nodes === lastInput) return lastOutput;
+			if (SlateElement.isElement(node)) {
+				if (node.type === "mention") {
+					const element = node as MentionElement;
+					// Store the actual value in the HTML, but style based on type
+					const mentionClass =
+						element.mentionType === "role"
+							? "bg-blue-100 text-blue-800 border border-blue-300"
+							: element.mentionType === "channel"
+								? "bg-green-100 text-green-800 border border-green-300"
+								: "bg-purple-100 text-purple-800 border border-purple-300";
 
-		// Stringify for cache lookup
-		const nodeKey = JSON.stringify(nodes);
-		const cached = cache.get(nodeKey);
-		if (cached) return cached;
+					// Generate a human-readable version for display in HTML
+					let displayText = element.value || "";
 
-		// Original logic but cached
-		const result = nodes
-			.map((node) => {
-				if (Text.isText(node)) {
-					return node.text;
-				}
-
-				if (SlateElement.isElement(node)) {
-					if (node.type === "mention") {
-						const element = node as MentionElement;
-						// Store the actual value in the HTML, but style based on type
-						const mentionClass =
-							element.mentionType === "role"
-								? "bg-blue-100 text-blue-800 border border-blue-300"
-								: element.mentionType === "channel"
-									? "bg-green-100 text-green-800 border border-green-300"
-									: "bg-purple-100 text-purple-800 border border-purple-300";
-
-						// Generate a human-readable version for display in HTML
-						let displayText = element.value || "";
-
-						if (
-							element.mentionType === "role" &&
-							displayText.startsWith("<@") &&
-							displayText.endsWith(">")
-						) {
+					if (element.mentionType === "role") {
+						if (displayText.startsWith("<@") && displayText.endsWith(">")) {
 							const roleId = displayText.substring(2, displayText.length - 1);
 							const roleName = getRoleNameFromId(roleId);
 							displayText = `@${roleName}`;
-						} else if (
-							element.mentionType === "channel" &&
-							displayText.startsWith("<#") &&
-							displayText.endsWith(">")
-						) {
+						}
+						// If it starts with @, keep the original display text from popover
+					} else if (element.mentionType === "channel") {
+						if (displayText.startsWith("<#") && displayText.endsWith(">")) {
 							const channelId = displayText.substring(
 								2,
 								displayText.length - 1,
@@ -226,45 +183,132 @@ const serializeToHtmlMemoized = (() => {
 							const channelName = getChannelNameFromId(channelId);
 							displayText = `#${channelName}`;
 						}
-
-						// Use the actual value (with IDs) as a data attribute, display the friendly name
-						return `<span class="${mentionClass} rounded-md px-1 py-0.5 text-md select-all" data-slate-leaf="true" data-slate-inline="true" data-slate-void="true" contenteditable="false" data-type="mention" data-mention-type="${element.mentionType}" data-value="${element.value || ""}"><span data-slate-string="true">${displayText}</span></span>`;
+						// If it starts with #, keep the original display text from popover
 					}
 
-					if (node.type === "paragraph") {
-						return `<div data-slate-node="element" style="position: relative;">${serializeToHtmlMemoized(node.children)}</div>`;
-					}
+					// Use the actual value (with IDs) as a data attribute, display the friendly name
+					return `<span class="${mentionClass} rounded-md px-1 py-0.5 text-md select-all" data-slate-leaf="true" data-slate-inline="true" data-slate-void="true" contenteditable="false" data-type="mention" data-mention-type="${element.mentionType}" data-value="${element.value || ""}"><span data-slate-string="true">${displayText}</span></span>`;
 				}
 
-				return "";
-			})
-			.join("");
-
-		// Cache the result
-		if (cache.size > 50) {
-			// Prevent unbounded growth
-			const firstKey = cache.keys().next().value;
-			if (firstKey) {
-				cache.delete(firstKey);
+				if (node.type === "paragraph") {
+					return `<div data-slate-node="element" style="position: relative;">${serializeToHtml(node.children)}</div>`;
+				}
 			}
-		}
-		cache.set(nodeKey, result);
 
-		// Update last references
-		lastInput = nodes;
-		lastOutput = result;
+			return "";
+		})
+		.join("");
+};
 
-		return result;
-	};
-})();
+// Deserialize HTML to Slate nodes
+export const deserializeHtml = (html: string): ParagraphElement[] => {
+	console.log("deserializeHtml input:", html);
 
-// Optimize the deserializeHtml function to use caching
-const deserializeHtml = (html: string): ParagraphElement[] => {
 	if (!html || typeof html !== "string") {
 		return [...EMPTY_VALUE];
 	}
 
-	// Normalize the HTML to avoid cache misses due to insignificant whitespace differences
+	// Process text and convert variables to mention elements
+	const processText = (text: string): (CustomText | MentionElement)[] => {
+		console.log("Processing text:", text);
+		const result: (CustomText | MentionElement)[] = [];
+
+		// Match variables like {level}, user mentions <@id>, channel mentions <#id>, and customize mentions <id:customize>
+		const pattern = /(<id:customize>|<@[^>]+>|<#[^>]+>|\{[^}]+\})/g;
+		let lastIndex = 0;
+		let match: RegExpExecArray | null;
+
+		// Use a separate assignment before the loop
+		match = pattern.exec(text);
+		while (match !== null) {
+			console.log("Found match:", match[0], "at index:", match.index);
+			// Add text before the match
+			const beforeText = text.slice(lastIndex, match.index);
+			if (beforeText) {
+				console.log("Adding text before match:", beforeText);
+				result.push({ text: beforeText });
+			}
+
+			// Add the mention element
+			const value = match[0];
+			let mentionType: MentionType = "variable";
+			let displayValue = value;
+
+			if (value.startsWith("{")) {
+				mentionType = "variable";
+			} else if (value.startsWith("<@")) {
+				mentionType = "role";
+			} else if (value.startsWith("<#") || value === "<id:customize>") {
+				mentionType = "channel";
+				if (value === "<id:customize>") {
+					displayValue = "Channels & Roles";
+				}
+			}
+
+			console.log("Adding mention:", {
+				type: "mention",
+				mentionType,
+				value,
+				displayValue,
+			});
+			result.push({
+				type: "mention",
+				mentionType,
+				children: [{ text: "" }],
+				value,
+			} as MentionElement);
+
+			lastIndex = match.index + match[0].length;
+			match = pattern.exec(text);
+		}
+
+		// Add any remaining text
+		const afterText = text.slice(lastIndex);
+		if (afterText) {
+			console.log("Adding remaining text:", afterText);
+			result.push({ text: afterText });
+		}
+
+		console.log("Process text result:", result);
+		return result;
+	};
+
+	// Special handling for <id:customize> tag
+	if (html.includes("<id:customize>")) {
+		// Fix the HTML by replacing the tag with a marker
+		const fixedHtml = html.replace(/<id:customize>/g, "###ID_CUSTOMIZE###");
+
+		// Process the fixed HTML
+		const div = document.createElement("div");
+		div.innerHTML = fixedHtml;
+
+		// Get the text content
+		const textContent = div.textContent || "";
+
+		// Process the text content, replacing the marker back to <id:customize>
+		const processedText = textContent.replace(
+			/###ID_CUSTOMIZE###/g,
+			"<id:customize>",
+		);
+		console.log("Processed text with restored tags:", processedText);
+
+		// Now process the text
+		const children = processText(processedText);
+
+		// Return a paragraph with the processed children
+		const result: ParagraphElement[] = [
+			{
+				type: "paragraph",
+				children,
+			},
+		];
+
+		// Cache the result
+		deserializationCache.set(html, result);
+		return result;
+	}
+
+	// Regular processing (original code)
 	const normalizedHtml = html.replace(/>\s+</g, "><").trim();
 
 	// Check cache first
@@ -276,70 +320,7 @@ const deserializeHtml = (html: string): ParagraphElement[] => {
 	const div = document.createElement("div");
 	div.innerHTML = normalizedHtml;
 
-	// Process text and convert variables to mention elements
-	const processText = (text: string): (CustomText | MentionElement)[] => {
-		const result: (CustomText | MentionElement)[] = [];
-
-		// Match variables like {level}, user mentions <@id>, channel mentions <#id> and <id:customize>id</id:customize>
-		const pattern =
-			/(\{[^}]+\}|<@[^>]+>|<#[^>]+>|<id:customize>\d+<\/id:customize>)/g;
-		let lastIndex = 0;
-		let match: RegExpExecArray | null;
-
-		// Use a separate assignment before the loop
-		match = pattern.exec(text);
-		while (match !== null) {
-			// Add text before the match
-			const beforeText = text.slice(lastIndex, match.index);
-			if (beforeText) {
-				result.push({ text: beforeText });
-			}
-
-			// Add the mention element
-			const value = match[0];
-			let mentionType: "variable" | "role" | "channel" = "variable";
-
-			if (value.startsWith("{")) {
-				mentionType = "variable";
-			} else if (value.startsWith("<@")) {
-				mentionType = "role";
-			} else if (value.startsWith("<#") || value.startsWith("<id:customize>")) {
-				mentionType = "channel";
-				// Preserve the original text for <id:customize> format
-				if (value.startsWith("<id:customize>")) {
-					result.push({
-						type: "mention",
-						mentionType,
-						children: [{ text: "" }],
-						value,
-					});
-					lastIndex = match.index + match[0].length;
-					match = pattern.exec(text);
-					continue;
-				}
-			}
-
-			result.push({
-				type: "mention",
-				mentionType,
-				children: [{ text: "" }],
-				value,
-			});
-
-			lastIndex = match.index + match[0].length;
-			match = pattern.exec(text);
-		}
-
-		// Add any remaining text
-		const afterText = text.slice(lastIndex);
-		if (afterText) {
-			result.push({ text: afterText });
-		}
-
-		return result;
-	};
-
-	// Function to extract the text content from an HTML element
+	// Function to extract text from HTML element (unchanged)
 	const getTextFromElement = (element: HTMLElement): string => {
 		return element.textContent || "";
 	};
@@ -384,8 +365,8 @@ const deserializeHtml = (html: string): ParagraphElement[] => {
 	return nodes;
 };
 
-// Memoize the Element component using React.memo to prevent unnecessary re-renders
-const Element = memo(
+// Element renderer component
+export const Element = memo(
 	({
 		attributes,
 		children,
@@ -397,12 +378,13 @@ const Element = memo(
 	}) => {
 		if (element.type === "mention") {
 			// Store the actual ID/value for form submission
-			const originalValue = element.value || "";
+			const mentionElement = element as MentionElement;
+			const originalValue = mentionElement.value || "";
 			// Display text will be user-friendly
 			let displayText = originalValue;
 			let mentionStyle = "bg-discord-foreground text-discord-bg";
 
-			if (element.mentionType === "role") {
+			if (mentionElement.mentionType === "role") {
 				// For roles: Change style and extract display name
 				mentionStyle = "bg-blue-100 text-blue-800 border border-blue-300";
 				// If the value is in format <@123456>, display a friendly format
@@ -411,19 +393,14 @@ const Element = memo(
 					const roleName = getRoleNameFromId(roleId);
 					displayText = `@${roleName}`;
 				}
-			} else if (element.mentionType === "channel") {
+			} else if (mentionElement.mentionType === "channel") {
 				// For channels: Change style and extract display name
 				mentionStyle = "bg-green-100 text-green-800 border border-green-300";
-				// If the value is in format <#123456> or <id:customize>123456</id:customize>, display a friendly format
-				if (displayText.startsWith("<#") && displayText.endsWith(">")) {
+				// If the value is in format <#123456>, display a friendly format
+				if (displayText === "<id:customize>") {
+					displayText = "Channels & Roles";
+				} else if (displayText.startsWith("<#") && displayText.endsWith(">")) {
 					const channelId = displayText.substring(2, displayText.length - 1);
-					const channelName = getChannelNameFromId(channelId);
-					displayText = `#${channelName}`;
-				} else if (
-					displayText.startsWith("<id:customize>") &&
-					displayText.endsWith("</id:customize>")
-				) {
-					const channelId = displayText.substring(12, displayText.length - 13);
 					const channelName = getChannelNameFromId(channelId);
 					displayText = `#${channelName}`;
 				}
@@ -437,7 +414,7 @@ const Element = memo(
 					{...attributes}
 					className={`${mentionStyle} rounded-md px-1 py-0.5 text-md select-all`}
 					contentEditable={false}
-					data-mention-type={element.mentionType}
+					data-mention-type={mentionElement.mentionType}
 					data-value={originalValue}
 				>
 					{children}
@@ -447,14 +424,15 @@ const Element = memo(
 		}
 
 		if (element.type === "mention-placeholder") {
+			const placeholderElement = element as MentionPlaceholderElement;
 			// Different styling based on mention type
 			let placeholderIcon = "";
 			let placeholderStyle = "";
 
-			if (element.mentionType === "role") {
+			if (placeholderElement.mentionType === "role") {
 				placeholderIcon = "@";
 				placeholderStyle = "bg-blue-100 text-blue-800 border border-blue-300";
-			} else if (element.mentionType === "channel") {
+			} else if (placeholderElement.mentionType === "channel") {
 				placeholderIcon = "#";
 				placeholderStyle =
 					"bg-green-100 text-green-800 border border-green-300";
@@ -480,7 +458,9 @@ const Element = memo(
 	},
 );
 
-// Optimize the getEditorInstance function with error handling and type safety
+Element.displayName = "SlateElement";
+
+// Get editor instance utility
 export function getEditorInstance(
 	id: string,
 ): (BaseEditor & ReactEditor) | null {
@@ -496,8 +476,8 @@ export function getEditorInstance(
 	}
 }
 
-// Memoize the MentionTextarea component using React.memo to prevent unnecessary re-renders
-export const MentionTextarea = memo(function MentionTextarea({
+// Main component
+export const MentionTextareaBase = memo(function MentionTextareaBase({
 	placeholder = "Type your message...",
 	onChange,
 	value = "",
@@ -510,8 +490,15 @@ export const MentionTextarea = memo(function MentionTextarea({
 	onMentionEnd,
 	onFocus,
 	onBlur,
-}: MentionTextareaProps) {
-	// Create editor only once per component instance
+}: MentionTextareaBaseProps) {
+	console.log("MentionTextareaBase props:", {
+		value,
+		maxLength,
+		singleLine,
+		rows,
+	});
+
+	// Create editor instance
 	const editor = useMemo(() => {
 		const e = withHistory(withReact(createEditor()));
 
@@ -560,18 +547,29 @@ export const MentionTextarea = memo(function MentionTextarea({
 		}
 	}, [editor]);
 
-	// Initialize with parsed HTML - improved to use cached parsing
+	// Calculate character count
+	const characterCount = useMemo(() => {
+		if (!value || typeof value !== "string") return 0;
+		// Simple regex to remove HTML tags for counting
+		return value.replace(/<[^>]*>/g, "").length;
+	}, [value]);
+
+	// Initialize with parsed HTML
 	const initialValue = useMemo(() => {
+		console.log("Parsing initial value:", value);
 		if (!value || typeof value !== "string") {
+			console.log("Empty or invalid value, using default");
 			return [...EMPTY_VALUE];
 		}
-		return deserializeHtml(value);
+		const parsed = deserializeHtml(value);
+		console.log("Parsed HTML result:", parsed);
+		return parsed;
 	}, [value]);
 
 	// Track the current mention state
 	const [mentionState, setMentionState] = useState<{
 		active: boolean;
-		type: "variable" | "role" | "channel" | null;
+		type: MentionType | null;
 		search: string;
 	}>({
 		active: false,
@@ -579,12 +577,14 @@ export const MentionTextarea = memo(function MentionTextarea({
 		search: "",
 	});
 
-	// Memoize the editor change handler to prevent recreating on each render
+	// Editor change handler
 	const handleChange = useCallback(
 		(value: Descendant[]) => {
+			console.log("Editor change value:", value);
 			if (onChange) {
-				// Use the memoized serialization function
-				const html = serializeToHtmlMemoized(value);
+				// Use the serialization function
+				const html = serializeToHtml(value);
+				console.log("Serialized HTML:", html);
 
 				// Check maxLength before processing further
 				if (maxLength !== undefined) {
@@ -602,15 +602,15 @@ export const MentionTextarea = memo(function MentionTextarea({
 		[onChange, maxLength],
 	);
 
-	// Memoize rows class calculations
+	// Calculate rows class
 	const rowsClass = useMemo(() => {
 		if (singleLine) return "";
 		return cn(
-			rows === 3 ? "h-[120px]" : "",
-			rows === 4 ? "h-[150px]" : "",
-			rows === 5 ? "h-[180px]" : "",
-			rows === 6 ? "h-[210px]" : "",
-			rows > 6 ? "h-[240px]" : "",
+			rows === 3 ? "min-h-[72px]" : "",
+			rows === 4 ? "min-h-[96px]" : "",
+			rows === 5 ? "min-h-[120px]" : "",
+			rows === 6 ? "min-h-[144px]" : "",
+			rows > 6 ? `min-h-[${rows * 24}px]` : "",
 		);
 	}, [rows, singleLine]);
 
@@ -630,7 +630,7 @@ export const MentionTextarea = memo(function MentionTextarea({
 		);
 	}, [singleLine, rowsClass, className]);
 
-	// Handle keyboard events - memoized to prevent recreation on each render
+	// Handle keyboard events
 	const handleKeyDown = useCallback(
 		(event: React.KeyboardEvent<HTMLDivElement>) => {
 			// For single line, prevent Enter key from creating new lines
@@ -651,17 +651,17 @@ export const MentionTextarea = memo(function MentionTextarea({
 					const range = domSelection.getRangeAt(0);
 					const rect = range.getBoundingClientRect();
 
-					let mentionType: "variable" | "role" | "channel" = "variable";
+					let mentionType: MentionType = "variable";
 					if (event.key === "@") mentionType = "role";
 					if (event.key === "#") mentionType = "channel";
 					if (event.key === "{") mentionType = "variable";
 
-					// Insert a placeholder element
+					// Insert a placeholder element with the trigger character
 					Transforms.insertNodes(editor, {
 						type: "mention-placeholder",
 						mentionType,
-						children: [{ text: "" }],
-					});
+						children: [{ text: event.key }],
+					} as MentionPlaceholderElement);
 
 					// Update the mention state
 					setMentionState({
@@ -694,7 +694,7 @@ export const MentionTextarea = memo(function MentionTextarea({
 				return;
 			}
 
-			// Other event handling logic (kept the same as original)
+			// Handle Escape key to cancel mentions
 			if (event.key === "Escape" && onMentionEnd) {
 				event.preventDefault();
 
@@ -729,43 +729,82 @@ export const MentionTextarea = memo(function MentionTextarea({
 				onMentionEnd();
 			}
 
-			// Handle backspace to delete characters in the mention search or end the mention
-			if (event.key === "Backspace" && mentionState.active) {
-				if (mentionState.search.length > 0) {
-					const newSearch = mentionState.search.slice(0, -1);
-					setMentionState((prev) => ({ ...prev, search: newSearch }));
+			// Handle backspace to remove mention placeholder
+			if (event.key === "Backspace" && mentionState.active && onMentionEnd) {
+				const [node] = Editor.nodes(editor, {
+					match: (n) =>
+						SlateElement.isElement(n) && n.type === "mention-placeholder",
+				});
 
-					const domSelection = window.getSelection();
-					if (domSelection && domSelection.rangeCount > 0 && onMentionStart) {
-						const range = domSelection.getRangeAt(0);
-						const rect = range.getBoundingClientRect();
+				if (node) {
+					const [element] = node;
+					const text = (element.children[0] as { text: string }).text;
 
-						onMentionStart({
-							type: mentionState.type ?? "variable",
-							search: newSearch,
-							domRect: rect,
-						});
-					}
-
-					event.preventDefault();
-					return;
-				}
-
-				if (mentionState.search.length === 0 && onMentionEnd) {
-					setMentionState({ active: false, type: null, search: "" });
-
-					const [node] = Editor.nodes(editor, {
-						match: (n) =>
-							SlateElement.isElement(n) && n.type === "mention-placeholder",
-					});
-
-					if (node) {
+					if (text.length <= 1) {
+						event.preventDefault();
 						Transforms.delete(editor, { at: node[1] });
+						setMentionState({ active: false, type: null, search: "" });
+						onMentionEnd();
 					}
-
-					onMentionEnd();
-					return;
 				}
+				return;
+			}
+
+			// Handle typing in mention placeholder
+			if (
+				mentionState.active &&
+				onMentionStart &&
+				!["Escape", "Enter", "Tab", "ArrowUp", "ArrowDown"].includes(event.key)
+			) {
+				const [node] = Editor.nodes(editor, {
+					match: (n) =>
+						SlateElement.isElement(n) && n.type === "mention-placeholder",
+				});
+
+				if (node) {
+					event.preventDefault();
+					const [element] = node;
+					const text = (element.children[0] as { text: string }).text;
+
+					if (event.key === "Backspace") {
+						if (text.length <= 1) {
+							Transforms.delete(editor, { at: node[1] });
+							setMentionState({ active: false, type: null, search: "" });
+							if (onMentionEnd) onMentionEnd();
+						} else {
+							const newText = text.slice(0, -1);
+							Transforms.insertText(editor, newText, { at: node[1] });
+
+							const domSelection = window.getSelection();
+							if (domSelection && domSelection.rangeCount > 0) {
+								const range = domSelection.getRangeAt(0);
+								const rect = range.getBoundingClientRect();
+
+								onMentionStart({
+									type: mentionState.type as MentionType,
+									search: newText.slice(1),
+									domRect: rect,
+								});
+							}
+						}
+					} else {
+						const newText = text + event.key;
+						Transforms.insertText(editor, newText, { at: node[1] });
+
+						const domSelection = window.getSelection();
+						if (domSelection && domSelection.rangeCount > 0) {
+							const range = domSelection.getRangeAt(0);
+							const rect = range.getBoundingClientRect();
+
+							onMentionStart({
+								type: mentionState.type as MentionType,
+								search: newText.slice(1),
+								domRect: rect,
+							});
+						}
+					}
+				}
+				return;
 			}
 
 			// Handle arrow key navigation to skip over mention elements
@@ -811,17 +850,16 @@ export const MentionTextarea = memo(function MentionTextarea({
 		}
 	}, [onFocus]);
 
-	const handleBlur = useCallback(() => {
+	const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
 		setIsFocused(false);
 		if (onBlur) {
-			onBlur();
+			onBlur(e);
 		}
-	}, [onBlur]);
+	};
 
 	// Return component with optimized rendering
 	return (
 		<div
-			id="mention-textarea"
 			className={cn("relative w-full", singleLine ? "flex items-center" : "")}
 			onFocus={handleFocus}
 			onBlur={handleBlur}
@@ -832,9 +870,11 @@ export const MentionTextarea = memo(function MentionTextarea({
 				onChange={handleChange}
 			>
 				<Editable
-					id="content-editable"
 					className={editorClassNames}
 					renderElement={(props) => <Element {...props} />}
+					onKeyDown={handleKeyDown}
+					style={style}
+					placeholder={placeholder}
 					renderPlaceholder={({ children, attributes }) => (
 						<div
 							{...attributes}
@@ -851,9 +891,6 @@ export const MentionTextarea = memo(function MentionTextarea({
 							<p>{children}</p>
 						</div>
 					)}
-					onKeyDown={handleKeyDown}
-					style={style}
-					placeholder={placeholder}
 					autoCorrect="off"
 					spellCheck="true"
 					data-testid="mention-textarea"
@@ -863,6 +900,13 @@ export const MentionTextarea = memo(function MentionTextarea({
 					suppressContentEditableWarning
 				/>
 			</Slate>
+			{maxLength && (
+				<div className="absolute bottom-1 right-2 text-xs text-muted-foreground">
+					{characterCount}/{maxLength}
+				</div>
+			)}
 		</div>
 	);
 });
+
+MentionTextareaBase.displayName = "MentionTextareaBase";

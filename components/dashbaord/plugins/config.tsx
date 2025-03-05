@@ -8,63 +8,51 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { RotateCw } from "lucide-react";
 import type { Plugin } from "@/hooks/use-plugins";
-import { PluginConfigForm } from "@/components/plugins/plugin-config-form";
+import {
+	hasPluginForm,
+	getPluginForm,
+} from "@/components/plugins/plugin-forms";
 import { Separator } from "@/components/ui/separator";
 
-export default function PluginConfig({
-	plugin,
-	guildId,
-}: { plugin: Plugin; guildId: string }) {
+interface ConfigProps {
+	plugin: Plugin;
+}
 
-	if (!plugin) {
-		return (
-			<div className="container mx-auto py-6">
-				<Card>
-					<CardHeader>
-						<div className="flex items-center">
-							<CardTitle>Loading configuration...</CardTitle>
-							<RotateCw className="ml-2 h-4 w-4 animate-spin" />
-						</div>
-					</CardHeader>
-				</Card>
-			</div>
-		);
+export function Config({ plugin }: ConfigProps) {
+	// Get the form component for this plugin
+	const PluginForm = plugin.id ? getPluginForm(plugin.id) : null;
+
+	if (!plugin.enabled) {
+		return null;
 	}
 
+	const name = {
+		levels: "Levels",
+		welcome_goodbye: "Welcome & Goodbye",
+	};
+
 	return (
-		<React.Fragment>
-			<div className="my-6 flex items-center justify-between">
-				{/* <Link
-					href={`/dashboard/${guildId}/plugin/${pluginId}`}
-					className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-				>
-					<ArrowLeft className="mr-2 h-4 w-4" />
-					Powrót do pluginu
-				</Link> */}
+		<Card className="py-6">
+			{/* <CardHeader>
+				<CardTitle>{name[plugin.id as keyof typeof name]} settings</CardTitle>
+				<CardDescription>
+					Customize the configuration of the{" "}
+					{name[plugin.id as keyof typeof name]} plugin for your server.
+				</CardDescription>
+			</CardHeader> */}
 
-				<h1 className="text-2xl font-bold">Configuration</h1>
-			</div>
+			{/* <Separator /> */}
 
-			<Card className="py-6">
-				<CardHeader>
-					<CardTitle>Plugin settings</CardTitle>
-					<CardDescription>
-						Customize the configuration of the{" "}
-						{String(plugin.name || plugin.id)} plugin for your server.
-					</CardDescription>
-				</CardHeader>
-
-				<Separator />
-
-				<CardContent className="pt-6">
-					<PluginConfigForm
-						plugin={plugin}
-						guildId={guildId}
-					/>
-				</CardContent>
-			</Card>
-		</React.Fragment>
+			<CardContent>
+				{PluginForm ? (
+					<PluginForm plugin={plugin} />
+				) : (
+					<p className="text-muted-foreground">
+						No configuration options available for this plugin.
+					</p>
+				)}
+			</CardContent>
+		</Card>
 	);
 }

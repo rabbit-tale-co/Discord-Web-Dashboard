@@ -9,11 +9,22 @@ import {
 	useEffect,
 	useRef,
 } from "react";
-import type { Plugin } from "@/hooks/use-plugins";
+import type {
+	PluginTypes,
+	Level,
+	Ticket,
+	WelcomeGoodbye,
+} from "@/hooks/use-plugins";
 import { usePlugins } from "@/hooks/use-plugins";
 import { useGuild } from "@/hooks/use-guilds";
 import { useParams } from "next/navigation";
 import type { GuildData } from "@/hooks/use-guilds";
+
+// Define the base plugin type using the types from use-plugins.ts
+export type Plugin = {
+	id: string;
+	enabled: boolean;
+} & Partial<PluginTypes>;
 
 interface PluginsContextType {
 	pluginsData: Plugin[];
@@ -75,12 +86,17 @@ export function useServerPlugins() {
 	// Simplified refetchPlugins that doesn't cause infinite loops
 	const refetchPlugins = useCallback(async () => {
 		try {
-			// Call the original refetch function
 			const freshData = await originalRefetchPlugins();
-
-			// If we get fresh data back, update the context directly
-			if (freshData && freshData.length > 0) {
-				updatePlugins(freshData);
+			if (freshData && Array.isArray(freshData)) {
+				const mappedPlugins = freshData.map((pluginData) => {
+					const plugin: Plugin = {
+						id: pluginData.id || "",
+						enabled: false,
+						...pluginData,
+					};
+					return plugin;
+				});
+				updatePlugins(mappedPlugins);
 			}
 			return freshData;
 		} catch (err) {
@@ -91,11 +107,17 @@ export function useServerPlugins() {
 
 	// Update plugins only once when they first load or when server changes
 	useEffect(() => {
-		// Skip if no plugins or if we already updated for this server
 		if (!plugins?.length || pluginsUpdatedRef.current) return;
 
-		// Update the context with the plugins
-		updatePlugins(plugins);
+		const mappedPlugins = plugins.map((pluginData) => {
+			const plugin: Plugin = {
+				id: pluginData.id || "",
+				enabled: false,
+				...pluginData,
+			};
+			return plugin;
+		});
+		updatePlugins(mappedPlugins);
 		pluginsUpdatedRef.current = true;
 	}, [plugins, updatePlugins]);
 

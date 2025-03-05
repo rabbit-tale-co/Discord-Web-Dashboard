@@ -25,15 +25,12 @@ export default function DashboardLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<div className="flex h-screen w-screen overflow-hidden">
+		<div className="flex min-h-screen">
 			<SidebarProvider>
 				<PluginsProvider>
 					<DashboardSidebar />
-					{/* <SidebarTrigger /> */}
-					<div className="flex flex-col w-full overflow-hidden">
-						{/* <DashboardHeader /> */}
-						<div className="flex-1 overflow-y-auto">{children}</div>
-						{/* <Footer /> */}
+					<div className="flex-1">
+						<div className="h-full">{children}</div>
 					</div>
 				</PluginsProvider>
 			</SidebarProvider>
