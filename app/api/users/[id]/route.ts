@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 			id: userData.id,
 			username: userData.username,
 			avatar: userData.avatar,
-			discriminator: userData.discriminator,
+			displayName: userData.global_name,
 		});
 	} catch (error) {
 		console.error("Error fetching user:", error);

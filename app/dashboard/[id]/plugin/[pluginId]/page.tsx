@@ -122,9 +122,9 @@ export default function PluginPage() {
 				? "/api/plugins/enable"
 				: "/api/plugins/disable";
 
-			console.log(
-				`Using ${endpoint} endpoint based on switch state: ${newEnabledState ? "enabled" : "disabled"}`,
-			);
+			// console.log(
+			// 	`Using ${endpoint} endpoint based on switch state: ${newEnabledState ? "enabled" : "disabled"}`,
+			// );
 
 			// Get bot_id from environment variables
 			const bot_id = process.env.NEXT_PUBLIC_BOT_ID;
@@ -133,12 +133,12 @@ export default function PluginPage() {
 			}
 
 			// Log the request details
-			console.log("Sending request to:", endpoint);
-			console.log("Request payload:", {
-				bot_id: "[HIDDEN]",
-				guild_id: guildId,
-				plugin_name: pluginId,
-			});
+			// console.log("Sending request to:", endpoint);
+			// console.log("Request payload:", {
+			// 	bot_id: "[HIDDEN]",
+			// 	guild_id: guildId,
+			// 	plugin_name: pluginId,
+			// });
 
 			// Send request to the appropriate API endpoint
 			// Using parameter names that match the backend API expectations
@@ -154,7 +154,7 @@ export default function PluginPage() {
 				}),
 			});
 
-			console.log("Response status:", response.status, response.statusText);
+			// console.log("Response status:", response.status, response.statusText);
 
 			if (!response.ok) {
 				const errorText = await response.text();
@@ -169,7 +169,7 @@ export default function PluginPage() {
 			}
 
 			const responseData = await response.json();
-			console.log("API Response data:", responseData);
+			// console.log("API Response data:", responseData);
 
 			// Only call refetchPlugins once
 			await refetchPlugins();

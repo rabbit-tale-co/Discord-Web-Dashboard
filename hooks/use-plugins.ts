@@ -205,7 +205,7 @@ async function getPluginsFromAPI(guildId: string): Promise<PluginTypes[]> {
 		const data = await response.json();
 
 		if (data) {
-			console.log("fetched plugins:", data);
+			// console.log("fetched plugins:", data);
 			updatePluginsCache(guildId, data);
 		}
 		return data;

@@ -5,7 +5,7 @@
  * Form for configuring welcome messages when users join the server.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -35,7 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { MentionTextarea } from "@/components/ui/mention/mention-textarea";
 import { type GuildData, useGuild } from "@/hooks/use-guilds";
 import { combineCategories, combineVariables } from "@/lib/variables";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import type { Variable } from "@/components/ui/mention";
 import { usePlugins, type WelcomeGoodbye } from "@/hooks/use-plugins";
 import { ChannelField } from "../fields/channel-field";
@@ -45,8 +45,7 @@ import { EmbedFieldsEditor } from "../fields/embed-fields-editor";
 import { EmbedPreview } from "../fields/embed-preview";
 import { RoleField } from "../fields/role-field";
 import { ColorPicker } from "../fields/color-picker";
-import { useGuildContext } from "@/context/guild-context";
-import { usePluginsContext } from "@/context/plugins-context";
+import type { User } from "discord.js";
 
 // Define the form schema
 const formSchema = z.object({
@@ -127,21 +126,32 @@ interface WelcomeFormProps {
 	plugin: WelcomeGoodbye;
 }
 
-export async function WelcomeForm({ plugin }: WelcomeFormProps) {
+export function WelcomeForm({ plugin }: WelcomeFormProps) {
 	const params = useParams();
 	const guildId = params.id as string;
 	const [activeSection, setActiveSection] = useState("welcome-message");
-	const { currentGuild: guildData, setCurrentGuildId } = useGuildContext();
-	const { refetchPlugins } = usePluginsContext();
+	const { guildData } = useGuild(guildId);
+	const { refetchPlugins } = usePlugins(guildData as GuildData);
 	const [isSaving, setIsSaving] = useState(false);
 	const [previewEmbed, setPreviewEmbed] = useState<NonNullable<
 		FormValues["embed_welcome"] | FormValues["embed_leave"]
 	> | null>(null);
-	const user = await getUser(process.env.NEXT_PUBLIC_BOT_ID as string);
+	const [user, setUser] = useState<User | null>(null);
 
+	// Fetch user data on component mount
 	useEffect(() => {
-		setCurrentGuildId(guildId);
-	}, [guildId, setCurrentGuildId]);
+		const fetchUser = async () => {
+			try {
+				const userData = await getUser(
+					process.env.NEXT_PUBLIC_BOT_ID as string,
+				);
+				setUser(userData);
+			} catch (error) {
+				console.error("Error fetching user:", error);
+			}
+		};
+		fetchUser();
+	}, []);
 
 	// Initialize the form with plugin config
 	const form = useForm<FormValues>({
@@ -159,27 +169,42 @@ export async function WelcomeForm({ plugin }: WelcomeFormProps) {
 		},
 	});
 
-	// Add helper function to replace variables
-	function replaceVariables(text?: string) {
-		if (!text) return "";
-		return text
-			.replace(/{username}/g, user?.displayName || "User")
-			.replace(/{user}/g, `<@${user?.id}>` || "@User")
-			.replace(/{server}/g, guildData?.guild_details?.name || "Server")
-			.replace(/{server_name}/g, guildData?.guild_details?.name || "Server")
-			.replace(/{server_image}/g, guildData?.guild_details?.icon || "")
-			.replace(/{avatar}/g, user?.avatar || "https://cdn.discordapp.com/embed/avatars/0.png")
-			.replace(/{user_avatar}/g, user?.avatar || "https://cdn.discordapp.com/embed/avatars/0.png")
-			.replace(/{server_avatar}/g, guildData?.guild_details?.icon || "https://cdn.discordapp.com/embed/avatars/1.png");
-	}
+	// Add helper function to replace variables with useCallback
+	const replaceVariables = useCallback(
+		(text?: string) => {
+			if (!text) return "";
+			console.log("replaceVariables user:", user);
+			return text
+				.replace(/{username}/g, user?.username || "Bot")
+				.replace(/{user}/g, `<@${user?.id}>` || "@User")
+				.replace(/{server}/g, guildData?.name || "Server")
+				.replace(/{server_name}/g, guildData?.name || "Server")
+				.replace(/{server_image}/g, guildData?.guild_details?.icon || "")
+				.replace(
+					/{avatar}/g,
+					user?.avatar || "https://cdn.discordapp.com/embed/avatars/0.png",
+				)
+				.replace(
+					/{user_avatar}/g,
+					user?.avatar || "https://cdn.discordapp.com/embed/avatars/0.png",
+				)
+				.replace(
+					/{server_avatar}/g,
+					guildData?.guild_details?.icon ||
+						"https://cdn.discordapp.com/embed/avatars/1.png",
+				);
+		},
+		[user, guildData],
+	);
 
 	// Update preview when embed fields change
 	useEffect(() => {
 		if (form.watch("type") === "embed") {
 			const section = activeSection;
-			const embedData = section === "welcome-embed"
-				? form.watch("embed_welcome")
-				: form.watch("embed_leave");
+			const embedData =
+				section === "welcome-embed"
+					? form.watch("embed_welcome")
+					: form.watch("embed_leave");
 
 			if (embedData) {
 				// Replace variables in preview
@@ -187,30 +212,36 @@ export async function WelcomeForm({ plugin }: WelcomeFormProps) {
 					...embedData,
 					title: replaceVariables(embedData.title),
 					description: replaceVariables(embedData.description),
-					fields: embedData.fields?.map(field => ({
+					fields: embedData.fields?.map((field) => ({
 						...field,
 						name: replaceVariables(field.name),
 						value: replaceVariables(field.value),
 					})),
-					footer: embedData.footer ? {
-						...embedData.footer,
-						text: replaceVariables(embedData.footer.text),
-					} : undefined,
-					thumbnail: embedData.thumbnail ? {
-						...embedData.thumbnail,
-						url: replaceVariables(embedData.thumbnail.url),
-					} : undefined,
-					image: embedData.image ? {
-						...embedData.image,
-						url: replaceVariables(embedData.image.url),
-					} : undefined,
+					footer: embedData.footer
+						? {
+								...embedData.footer,
+								text: replaceVariables(embedData.footer.text),
+							}
+						: undefined,
+					thumbnail: embedData.thumbnail
+						? {
+								...embedData.thumbnail,
+								url: replaceVariables(embedData.thumbnail.url),
+							}
+						: undefined,
+					image: embedData.image
+						? {
+								...embedData.image,
+								url: replaceVariables(embedData.image.url),
+							}
+						: undefined,
 				};
 				setPreviewEmbed(previewData);
 			} else {
 				setPreviewEmbed(null);
 			}
 		}
-	}, [form.watch, activeSection, guildData]);
+	}, [form.watch, activeSection, replaceVariables]);
 
 	// Update form values when plugin data changes
 	useEffect(() => {
@@ -457,9 +488,7 @@ export async function WelcomeForm({ plugin }: WelcomeFormProps) {
 									render={({ field }) => (
 										<FormItem>
 											<FormLabel>Title</FormLabel>
-											<FormDescription>
-												The title of your embed
-											</FormDescription>
+											<FormDescription>The title of your embed</FormDescription>
 											<FormControl>
 												<MentionTextarea
 													value={field.value || ""}

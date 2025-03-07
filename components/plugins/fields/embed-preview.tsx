@@ -9,6 +9,7 @@ interface UserData {
 	id: string;
 	username?: string;
 	avatar: string | null;
+	displayName?: string;
 }
 
 interface EmbedPreviewProps {
@@ -43,15 +44,33 @@ function parseText(
 ): (string | ReactElement)[] {
 	if (!text) return [];
 
+	console.log("userData", userData);
+
 	const parts: (string | ReactElement)[] = [];
 	let currentIndex = 0;
 
 	// Regular expressions for different patterns
 	const patterns = [
 		{
-			regex: /<@(\d+)>/g,
+			regex: /<@!?(\d+)>/g, // Match both <@user_id> and <@!user_id> formats for user mentions
 			process: (id: string) => {
-				const role = guildData?.roles?.find((r) => r.id === id);
+				// If the ID matches the current user's ID, use their username
+				if (userData && String(userData.id) === String(id)) {
+					return (
+						<Mention key={`user-${id}`}>@{userData.username || "User"}</Mention>
+					);
+				}
+
+				// Without members data, we can only show a generic user mention
+				return <Mention key={`user-${id}`}>@User</Mention>;
+			},
+		},
+		{
+			regex: /<@&(\d+)>/g, // Match role mentions with format <@&role_id>
+			process: (id: string) => {
+				// Compare string representation of IDs to avoid type mismatches
+				const role = guildData?.roles?.find((r) => String(r.id) === String(id));
+
 				return (
 					<Mention key={`role-${id}`}>@{role?.name || "Unknown Role"}</Mention>
 				);
@@ -60,7 +79,10 @@ function parseText(
 		{
 			regex: /<#(\d+)>/g,
 			process: (id: string) => {
-				const channel = guildData?.channels?.find((c) => c.id === id);
+				// Compare as strings to avoid type mismatches
+				const channel = guildData?.channels?.find(
+					(c) => String(c.id) === String(id),
+				);
 				return (
 					<Mention key={`channel-${id}`}>
 						#{channel?.name || "unknown-channel"}
@@ -75,8 +97,17 @@ function parseText(
 		{
 			regex: /{user}/g,
 			process: () => (
-				<Mention key="user">@{userData?.username || "User"}</Mention>
+				<Mention key="user">
+					@{userData?.displayName || userData?.username || "Bot"}
+				</Mention>
 			),
+		},
+		{
+			regex: /{username}/g,
+			process: () => {
+				console.log("userData", userData);
+				return <span key="username">{userData?.username || "Bot"}</span>;
+			},
 		},
 		{
 			regex: /{server_name}/g,
@@ -112,6 +143,10 @@ function parseText(
 
 export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 	const { userData } = useUser(process.env.NEXT_PUBLIC_BOT_ID as string);
+
+	// Debug log to check guildData
+	// console.log("EmbedPreview guildData:", guildData);
+	// console.log("Roles available:", guildData?.roles);
 
 	return (
 		<div className="border rounded-lg p-4 bg-zinc-50">

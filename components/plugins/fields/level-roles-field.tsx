@@ -104,7 +104,7 @@ export function LevelRolesField({
 										}
 										render={({ field }) => {
 											// Debug log
-											console.log(`Role field ${name}.${index}:`, field.value);
+											// console.log(`Role field ${name}.${index}:`, field.value);
 
 											return (
 												<FormItem>
@@ -164,7 +164,7 @@ export function LevelRolesField({
 							append("");
 						}
 						// Debug log
-						console.log(`Added new ${showLevel ? "level role" : "role"}`);
+						// console.log(`Added new ${showLevel ? "level role" : "role"}`);
 					}}
 				>
 					Add {showLevel ? "Level Role" : "Role"}
