@@ -1,8 +1,8 @@
 "use client";
 
-import type React from "react";
+import React from "react";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import type { BaseEditor, Descendant, Range as SlateRange } from "slate";
+import type { Descendant } from "slate";
 import {
 	Editor,
 	Transforms,
@@ -10,7 +10,7 @@ import {
 	Element as SlateElement,
 	createEditor,
 } from "slate";
-import { Slate, Editable, withReact, type ReactEditor } from "slate-react";
+import { Slate, Editable, withReact, ReactEditor } from "slate-react";
 import { withHistory } from "slate-history";
 import { useParams } from "next/navigation";
 
@@ -18,60 +18,28 @@ import { cn } from "@/lib/utils";
 import { getCachedData } from "@/lib/cache";
 import type { GuildData } from "@/types/guild";
 import { useUser } from "@/hooks/use-user";
+import { globalVariables } from "@/lib/variables";
+import { VariableMention } from "./variable-mention";
+import type {
+	CustomText,
+	Channel,
+	MentionType,
+	MentionElement,
+	MentionPlaceholderElement,
+	ParagraphElement,
+	WindowWithEditors,
+} from "./types";
+import type { Variable } from "@/components/ui/mention/mention-popover";
 
-// If you want a popover UI for mention suggestions, you can import your own popover components here.
-// import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-// import { Command, CommandList, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
-
-// Extend the `window` object so we can store the editor instance globally (optional).
-interface WindowWithEditors extends Window {
-	__slateEditorInstances?: Record<string, BaseEditor & ReactEditor>;
-}
-
-// Extend window for guild data caching (roles/channels).
-interface WindowWithGuildData extends Window {
-	__guildData?: GuildData;
-}
-
-type MentionType = "variable" | "role" | "channel";
-
-// Mention element
-interface MentionElement {
-	type: "mention";
-	mentionType: MentionType;
-	value: string; // e.g. "<@1234>", "<#5678>", "{varName}"
-	displayValue: string; // The human-readable display value
-	children: [{ text: "" }]; // void element child
-}
-
-// Mention placeholder (when user has typed "@" or "#" but hasn't selected yet).
-interface MentionPlaceholderElement {
-	type: "mention-placeholder";
-	mentionType: MentionType;
-	children: [{ text: string }]; // store partial user-typed text in `text`
-}
-
-// Basic paragraph
-interface ParagraphElement {
-	type: "paragraph";
-	children: Array<CustomText | MentionElement | MentionPlaceholderElement>;
-}
-
-type CustomText = { text: string };
-
-type CustomElement =
-	| ParagraphElement
-	| MentionElement
-	| MentionPlaceholderElement;
-
-// Let Slate know about our custom types
-declare module "slate" {
-	interface CustomTypes {
-		Editor: BaseEditor & ReactEditor;
-		Element: CustomElement;
-		Text: CustomText;
-	}
-}
+import { Popover, PopoverContent } from "@/components/ui/popover";
+import {
+	Command,
+	CommandList,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+} from "@/components/ui/command";
 
 // The props for your final MentionTextarea
 export interface MentionTextareaProps {
@@ -125,11 +93,12 @@ export function MentionTextarea({
 	const guildId = params.id as string;
 	console.log("Extracted guildId:", guildId);
 
+	// Add ref for the editor container
+	const editorRef = useRef<HTMLDivElement>(null);
+
 	// Roles and channels from localStorage
 	const [roles, setRoles] = useState<Array<{ id: string; name: string }>>([]);
-	const [channels, setChannels] = useState<Array<{ id: string; name: string }>>(
-		[],
-	);
+	const [channels, setChannels] = useState<Array<Channel>>([]);
 
 	// Get bot data using useUser hook
 	const { userData: botData } = useUser(process.env.NEXT_PUBLIC_BOT_ID || "");
@@ -142,7 +111,13 @@ export function MentionTextarea({
 
 			if (cached?.data) {
 				setRoles(cached.data.roles || []);
-				setChannels(cached.data.channels || []);
+				// Filter out category channels (type 4 is GUILD_CATEGORY) and ensure type is defined
+				const nonCategoryChannels = (cached.data.channels || []).filter(
+					(channel): channel is Channel => {
+						return typeof channel.type === "number" && channel.type !== 4;
+					},
+				);
+				setChannels(nonCategoryChannels);
 			} else {
 				console.log("No cached data found or data is invalid");
 			}
@@ -250,10 +225,26 @@ export function MentionTextarea({
 		[onBlur],
 	);
 
-	/**
-	 * If you want to handle mention triggers internally, you can do so here:
-	 * (For instance, if user types `@`, we open a mention popover.)
-	 */
+	// Add useEffect to handle initial focus
+	useEffect(() => {
+		if (editorRef.current) {
+			const editable = editorRef.current.querySelector(
+				'[contenteditable="true"]',
+			);
+			if (editable instanceof HTMLElement) {
+				editable.focus();
+			}
+		}
+	}, []);
+
+	// Add state for mention popover
+	const [mentionPopover, setMentionPopover] = useState<{
+		type: MentionType;
+		search: string;
+		rect?: DOMRect;
+	} | null>(null);
+
+	// Update handleKeyDown to use local state
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent<HTMLDivElement>) => {
 			// If single line and press Enter, prevent new line:
@@ -262,8 +253,30 @@ export function MentionTextarea({
 				return;
 			}
 
-			// Basic mention triggers (@, #, {).
-			if (["@", "#", "{"].includes(e.key) && onMentionStart) {
+			// If pressing Escape and we have a mention popover open, close it
+			if (e.key === "Escape" && mentionPopover) {
+				e.preventDefault();
+				// Remove any existing mention placeholders
+				try {
+					const [placeholderEntry] = Editor.nodes(editor, {
+						match: (n) =>
+							SlateElement.isElement(n) && n.type === "mention-placeholder",
+					});
+
+					if (placeholderEntry) {
+						const [_, path] = placeholderEntry;
+						Transforms.removeNodes(editor, { at: path });
+					}
+				} catch (err) {
+					console.error("Error removing placeholder:", err);
+				}
+				setMentionPopover(null);
+				onMentionEnd?.();
+				return;
+			}
+
+			// Basic mention triggers (@, #, {)
+			if (["@", "#", "{"].includes(e.key)) {
 				e.preventDefault();
 				const domSel = window.getSelection();
 				if (domSel && domSel.rangeCount > 0) {
@@ -274,26 +287,34 @@ export function MentionTextarea({
 					if (e.key === "@") mentionType = "role";
 					if (e.key === "#") mentionType = "channel";
 
-					// Insert a placeholder so user can keep typing
+					// Get the current selection
+					const { selection } = editor;
+					if (!selection) return;
+
+					// Insert a new placeholder with the trigger character
 					Transforms.insertNodes(editor, {
 						type: "mention-placeholder",
 						mentionType,
-						children: [{ text: e.key }], // store typed char
+						children: [{ text: "" }],
 					});
-					onMentionStart({
+
+					// Update local state
+					setMentionPopover({
+						type: mentionType,
+						search: "",
+						rect,
+					});
+
+					// Also call external handler if provided
+					onMentionStart?.({
 						type: mentionType,
 						search: "",
 						domRect: rect,
 					});
 				}
 			}
-
-			// If pressing Escape, close mention popover
-			if (e.key === "Escape" && onMentionEnd) {
-				onMentionEnd();
-			}
 		},
-		[singleLine, onMentionStart, onMentionEnd, editor],
+		[singleLine, onMentionStart, onMentionEnd, editor, mentionPopover],
 	);
 
 	/**
@@ -312,14 +333,20 @@ export function MentionTextarea({
 		singleLine ? "h-10 overflow-y-hidden overflow-x-auto" : "overflow-y-auto",
 		"px-3 py-2",
 		focused ? "ring-1 ring-ring" : "",
+		"focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
 		className,
 	);
 
 	return (
-		<div className="relative w-full" onFocus={handleFocus} onBlur={handleBlur}>
+		<div
+			ref={editorRef}
+			className="relative w-full focus-within:outline-none"
+			onFocus={handleFocus}
+			onBlur={handleBlur}
+		>
 			<Slate
 				editor={editor}
-				initialValue={initialValue}
+				initialValue={initialValue as Descendant[]}
 				onChange={handleEditorChange}
 			>
 				<Editable
@@ -332,12 +359,196 @@ export function MentionTextarea({
 					renderElement={(props) => (
 						<MentionElementRenderer
 							{...props}
+							element={props.element as unknown as RenderElement}
 							roles={roles}
 							channels={channels}
 						/>
 					)}
 				/>
 			</Slate>
+
+			{mentionPopover && (
+				<Popover
+					open={true}
+					onOpenChange={(open) => {
+						if (!open) {
+							try {
+								const [placeholderEntry] = Editor.nodes(editor, {
+									match: (n) =>
+										SlateElement.isElement(n) &&
+										n.type === "mention-placeholder",
+								});
+
+								if (placeholderEntry) {
+									const [node, path] = placeholderEntry;
+									// Just remove the placeholder when closing without selection
+									Transforms.removeNodes(editor, { at: path });
+									ReactEditor.focus(editor);
+								}
+							} catch (err) {
+								console.error("Error removing placeholder:", err);
+							}
+							setMentionPopover(null);
+							onMentionEnd?.();
+						}
+					}}
+				>
+					<PopoverContent
+						className="w-[200px] p-0"
+						style={{
+							position: "absolute",
+							top: mentionPopover.rect
+								? `${mentionPopover.rect.bottom + window.scrollY}px`
+								: "0",
+							left: mentionPopover.rect
+								? `${mentionPopover.rect.left + window.scrollX}px`
+								: "0",
+						}}
+					>
+						<Command>
+							<CommandInput
+								placeholder={`Search ${mentionPopover.type}s...`}
+								onKeyDown={(e) => {
+									if (e.key === "Escape") {
+										e.preventDefault();
+										e.stopPropagation();
+										setMentionPopover(null);
+										onMentionEnd?.();
+									}
+								}}
+							/>
+							<CommandList>
+								<CommandEmpty>No results found.</CommandEmpty>
+								{mentionPopover.type === "role" && (
+									<CommandGroup>
+										{roles.map((role) => (
+											<CommandItem
+												key={role.id}
+												onSelect={() => {
+													try {
+														const [placeholderEntry] = Editor.nodes(editor, {
+															match: (n) =>
+																SlateElement.isElement(n) &&
+																n.type === "mention-placeholder",
+														});
+
+														if (placeholderEntry) {
+															const [node, path] = placeholderEntry;
+
+															// Replace the placeholder with mention in a single operation
+															Transforms.setNodes<MentionElement>(
+																editor,
+																{
+																	type: "mention",
+																	mentionType: "role",
+																	value: `<@&${role.id}>`,
+																	displayValue: `@${role.name}`,
+																	children: [{ text: "" }],
+																} as MentionElement,
+																{ at: path },
+															);
+
+															// Move cursor after the mention
+															const after = Editor.after(editor, path);
+															if (after) {
+																Transforms.select(editor, after);
+																ReactEditor.focus(editor);
+															}
+														}
+													} catch (err) {
+														console.error(
+															"Error handling mention selection:",
+															err,
+														);
+													}
+													setMentionPopover(null);
+												}}
+											>
+												@{role.name}
+											</CommandItem>
+										))}
+									</CommandGroup>
+								)}
+								{mentionPopover.type === "channel" && (
+									<CommandGroup>
+										{channels.map((channel) => (
+											<CommandItem
+												key={channel.id}
+												onSelect={() => {
+													try {
+														const [placeholderEntry] = Editor.nodes(editor, {
+															match: (n) =>
+																SlateElement.isElement(n) &&
+																n.type === "mention-placeholder",
+														});
+
+														if (placeholderEntry) {
+															const [node, path] = placeholderEntry;
+
+															// Replace the placeholder with mention in a single operation
+															Transforms.setNodes<MentionElement>(
+																editor,
+																{
+																	type: "mention",
+																	mentionType: "channel",
+																	value: `<#${channel.id}>`,
+																	displayValue: `#${channel.name}`,
+																	children: [{ text: "" }],
+																} as MentionElement,
+																{ at: path },
+															);
+
+															// Move cursor after the mention
+															const after = Editor.after(editor, path);
+															if (after) {
+																Transforms.select(editor, after);
+																ReactEditor.focus(editor);
+															}
+														}
+													} catch (err) {
+														console.error(
+															"Error handling mention selection:",
+															err,
+														);
+													}
+													setMentionPopover(null);
+												}}
+											>
+												#{channel.name}
+											</CommandItem>
+										))}
+									</CommandGroup>
+								)}
+								{mentionPopover.type === "variable" &&
+									Object.entries(
+										globalVariables.reduce<Record<string, Variable[]>>(
+											(acc, variable) => {
+												const category = variable.category || "Other";
+												if (!acc[category]) {
+													acc[category] = [];
+												}
+												acc[category].push(variable);
+												return acc;
+											},
+											{},
+										),
+									).map(([category, variables]) => (
+										<CommandGroup key={category} heading={category}>
+											{variables.map((variable) => (
+												<VariableMention
+													key={variable.id}
+													variable={variable}
+													editor={editor}
+													onSelect={() => setMentionPopover(null)}
+												/>
+											))}
+										</CommandGroup>
+									))}
+							</CommandList>
+						</Command>
+					</PopoverContent>
+				</Popover>
+			)}
 		</div>
 	);
 }
@@ -345,6 +556,24 @@ export function MentionTextarea({
 /* -------------------------------------------------------------
    RENDER: MENTION ELEMENT
    ------------------------------------------------------------- */
+type RenderElement =
+	| {
+			type: "mention";
+			mentionType: MentionType;
+			value: string;
+			displayValue: string;
+			children: [{ text: string }];
+	  }
+	| {
+			type: "mention-placeholder";
+			mentionType: MentionType;
+			children: [{ text: string }];
+	  }
+	| {
+			type: "paragraph";
+			children: Array<CustomText | MentionElement | MentionPlaceholderElement>;
+	  };
+
 function MentionElementRenderer({
 	element,
 	attributes,
@@ -352,11 +581,11 @@ function MentionElementRenderer({
 	roles,
 	channels,
 }: {
-	element: CustomElement;
+	element: RenderElement;
 	attributes: React.HTMLAttributes<HTMLElement>;
 	children: React.ReactNode;
 	roles: Array<{ id: string; name: string }>;
-	channels: Array<{ id: string; name: string }>;
+	channels: Array<Channel>;
 }) {
 	if (element.type === "mention") {
 		const mention = element as MentionElement;
@@ -476,7 +705,6 @@ function MentionElementRenderer({
 				data-mention-placeholder
 			>
 				<span style={{ display: "none" }}>{children}</span>
-				{placeholder.children[0]?.text || ""}
 				{placeholderIcon}
 			</span>
 		);
@@ -545,7 +773,7 @@ function serializeToHtml(
 				switch (node.type) {
 					case "mention": {
 						const mention = node as MentionElement;
-						const safeValue = mention.value || "";
+						const safeValue = (mention.value || "").trim(); // Trim the value to remove newlines
 
 						// Transform mentions using the same logic as display
 						let displayValue = safeValue;
@@ -590,10 +818,11 @@ function serializeToHtml(
 						return `<span data-type="mention" data-value="${safeValue}" contenteditable="false">${displayValue}</span>`;
 					}
 					case "paragraph":
-						return `<p>${serializeToHtml(node.children, transformOptions)}</p>`;
+						return `<p>${serializeToHtml(node.children, transformOptions)}</p>\n`;
 					case "mention-placeholder": {
 						const m = node as MentionPlaceholderElement;
-						return `<span data-type="mention-placeholder" data-value="${m.children[0]?.text}"></span>`;
+						const safeValue = (m.children[0]?.text || "").trim();
+						return `<span data-type="mention-placeholder" data-value="${safeValue}"></span>`;
 					}
 					default: {
 						const unknownElement = node as { children?: Descendant[] };
@@ -771,7 +1000,7 @@ function guessMentionType(value: string): MentionType {
  */
 interface TransformOptions {
 	roles?: Array<{ id: string; name: string }>;
-	channels?: Array<{ id: string; name: string }>;
+	channels?: Array<Channel>;
 	botId?: string;
 	botName?: string;
 }
