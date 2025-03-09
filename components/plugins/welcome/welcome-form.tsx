@@ -5,12 +5,13 @@
  * Form for configuring welcome messages when users join the server.
  */
 
-import { useState, useEffect, useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
 import { Colors } from "@/lib/constants/colors";
+import React from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +47,7 @@ import { EmbedPreview } from "../fields/embed-preview";
 import { RoleField } from "../fields/role-field";
 import { ColorPicker } from "../fields/color-picker";
 import type { User } from "discord.js";
+import { MessageField } from "../fields/message-field";
 
 // Define the form schema
 const formSchema = z.object({
@@ -169,11 +171,16 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 		},
 	});
 
+	// Watch all form values for changes
+	const formValues = useWatch({
+		control: form.control,
+	});
+
 	// Add helper function to replace variables with useCallback
 	const replaceVariables = useCallback(
 		(text?: string) => {
 			if (!text) return "";
-			console.log("replaceVariables user:", user);
+			// console.log("replaceVariables user:", user);
 			return text
 				.replace(/{username}/g, user?.username || "Bot")
 				.replace(/{user}/g, `<@${user?.id}>` || "@User")
@@ -197,17 +204,17 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 		[user, guildData],
 	);
 
-	// Update preview when embed fields change
+	// Update preview when any form field changes
 	useEffect(() => {
-		if (form.watch("type") === "embed") {
+		if (formValues.type === "embed") {
 			const section = activeSection;
 			const embedData =
 				section === "welcome-embed"
-					? form.watch("embed_welcome")
-					: form.watch("embed_leave");
+					? formValues.embed_welcome
+					: formValues.embed_leave;
 
 			if (embedData) {
-				// Replace variables in preview
+				// Replace variables in preview but keep HTML structure intact
 				const previewData = {
 					...embedData,
 					title: replaceVariables(embedData.title),
@@ -236,12 +243,16 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 							}
 						: undefined,
 				};
+
+				// Debug log to check the preview data
+				// console.log("Setting preview embed data:", previewData);
+
 				setPreviewEmbed(previewData);
 			} else {
 				setPreviewEmbed(null);
 			}
 		}
-	}, [form.watch, activeSection, replaceVariables]);
+	}, [formValues, activeSection, replaceVariables]);
 
 	// Update form values when plugin data changes
 	useEffect(() => {
@@ -273,6 +284,27 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 
 	const variables = combineVariables(welcomeVariables);
 	const categories = combineCategories(welcomeCategories);
+
+	// Dodajemy zmienne i kategorie do obiektu window
+	useEffect(() => {
+		if (typeof window !== "undefined") {
+			const windowWithVars = window as unknown as {
+				__guildData?: typeof guildData;
+				__welcomeVariables?: typeof variables;
+				__variableCategories?: typeof categories;
+			};
+
+			windowWithVars.__guildData = guildData;
+			windowWithVars.__welcomeVariables = variables;
+			windowWithVars.__variableCategories = categories;
+		}
+	}, [guildData, variables, categories]);
+
+	// Add console logs for debugging
+	// console.log("Variables:", variables);
+	// console.log("Categories:", categories);
+	// console.log("Roles:", guildData?.roles);
+	// console.log("Channels:", guildData?.channels);
 
 	// Handle form submission
 	const handleSubmit = async (values: FormValues) => {
@@ -398,64 +430,24 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 					</TabsList>
 
 					<TabsContent value="welcome-message" className="space-y-4">
-						<FormField
-							control={form.control}
+						<MessageField
 							name="welcome_message"
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>Welcome Message</FormLabel>
-									<FormDescription>
-										The message sent when a user joins. Use variables like{" "}
-										{"{user}"}, {"{server}"}, {"{server_name}"}, {"{username}"},{" "}
-										{"{server_image}"}, and {"{avatar}"}.
-									</FormDescription>
-									<FormControl>
-										<MentionTextarea
-											value={field.value || ""}
-											onChange={field.onChange}
-											variables={variables}
-											categories={categories}
-											placeholder="Welcome {user} to {server}!"
-											roles={guildData?.roles || []}
-											channels={guildData?.channels || []}
-											maxLength={2000}
-											rows={5}
-										/>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
+							label="Welcome Message"
+							description="Message that will be sent to users when they join the server"
+							showEmojiPicker={false}
+							rows={3}
+							maxLength={1000}
 						/>
 					</TabsContent>
 
 					<TabsContent value="leave-message" className="space-y-4">
-						<FormField
-							control={form.control}
+						<MessageField
 							name="leave_message"
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>Leave Message</FormLabel>
-									<FormDescription>
-										The message sent when a user leaves. Use variables like{" "}
-										{"{user}"}, {"{server}"}, {"{server_name}"}, {"{username}"},{" "}
-										{"{server_image}"}, and {"{avatar}"}.
-									</FormDescription>
-									<FormControl>
-										<MentionTextarea
-											value={field.value || ""}
-											onChange={field.onChange}
-											variables={variables}
-											categories={categories}
-											placeholder="Goodbye {user} from {server}!"
-											roles={guildData?.roles || []}
-											channels={guildData?.channels || []}
-											maxLength={2000}
-											rows={3}
-										/>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
+							label="Leave Message"
+							description="Message that will be sent to users when they leave the server"
+							showEmojiPicker={false}
+							rows={3}
+							maxLength={1000}
 						/>
 					</TabsContent>
 
@@ -482,95 +474,43 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 									)}
 								/>
 
-								<FormField
-									control={form.control}
+								<MessageField
 									name="embed_welcome.title"
-									render={({ field }) => (
-										<FormItem>
-											<FormLabel>Title</FormLabel>
-											<FormDescription>The title of your embed</FormDescription>
-											<FormControl>
-												<MentionTextarea
-													value={field.value || ""}
-													onChange={field.onChange}
-													variables={variables}
-													categories={categories}
-													placeholder="Welcome to {server}!"
-													maxLength={100}
-													rows={1}
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
+									label="Title"
+									description="The title of your welcome embed"
+									showEmojiPicker={false}
+									rows={1}
+									maxLength={100}
 								/>
 
-								<FormField
-									control={form.control}
+								<MessageField
 									name="embed_welcome.description"
-									render={({ field }) => (
-										<FormItem>
-											<FormLabel>Description</FormLabel>
-											<FormDescription>
-												The main content of your welcome embed
-											</FormDescription>
-											<FormControl>
-												<MentionTextarea
-													value={field.value || ""}
-													onChange={field.onChange}
-													variables={variables}
-													categories={categories}
-													placeholder="Hey {user}, welcome to our community!"
-													maxLength={500}
-													rows={4}
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
+									label="Description"
+									description="The main content of your welcome embed"
+									showEmojiPicker={false}
+									rows={4}
+									maxLength={500}
 								/>
 
-								<FormField
-									control={form.control}
+								<EmbedFieldsEditor
 									name="embed_welcome.fields"
-									render={() => (
-										<EmbedFieldsEditor
-											name="embed_welcome.fields"
-											label="Fields"
-											description="Add fields to your welcome embed"
-										/>
-									)}
+									label="Fields"
+									description="Add fields to your welcome embed"
 								/>
 
-								<FormField
-									control={form.control}
+								<MessageField
 									name="embed_welcome.footer.text"
-									render={({ field }) => (
-										<FormItem>
-											<FormLabel>Footer</FormLabel>
-											<FormDescription>
-												Text that appears at the bottom of the welcome embed
-											</FormDescription>
-											<FormControl>
-												<MentionTextarea
-													value={field.value || ""}
-													onChange={field.onChange}
-													variables={variables}
-													categories={categories}
-													placeholder="Enjoy your stay!"
-													maxLength={100}
-													rows={1}
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
+									label="Footer"
+									description="Text that appears at the bottom of the welcome embed"
+									showEmojiPicker={false}
+									singleLine
+									maxLength={100}
 								/>
 							</div>
 
 							<div className="sticky top-4">
 								<EmbedPreview
-									embed={previewEmbed}
+									embed={formValues.type === "embed" ? previewEmbed : null}
 									guildData={guildData as GuildData}
 								/>
 							</div>
@@ -618,6 +558,11 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 													placeholder="Goodbye from {server}!"
 													maxLength={100}
 													rows={1}
+													roles={guildData?.roles || []}
+													channels={guildData?.channels || []}
+													singleLine={false}
+													showEmojiPicker={true}
+													showSuggestions={true}
 												/>
 											</FormControl>
 											<FormMessage />
@@ -643,6 +588,11 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 													placeholder="{user} has left the server."
 													maxLength={500}
 													rows={4}
+													roles={guildData?.roles || []}
+													channels={guildData?.channels || []}
+													singleLine={false}
+													showEmojiPicker={true}
+													showSuggestions={true}
 												/>
 											</FormControl>
 											<FormMessage />
@@ -662,35 +612,16 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 									)}
 								/>
 
-								<FormField
-									control={form.control}
+								<MessageField
 									name="embed_leave.footer.text"
-									render={({ field }) => (
-										<FormItem>
-											<FormLabel>Footer</FormLabel>
-											<FormDescription>
-												Text that appears at the bottom of the leave embed
-											</FormDescription>
-											<FormControl>
-												<MentionTextarea
-													value={field.value || ""}
-													onChange={field.onChange}
-													variables={variables}
-													categories={categories}
-													placeholder="We hope to see you again!"
-													maxLength={100}
-													rows={1}
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
+									label="Footer"
+									description="Text that appears at the bottom of the leave embed"
 								/>
 							</div>
 
 							<div className="sticky top-4">
 								<EmbedPreview
-									embed={form.watch("type") === "embed" ? previewEmbed : null}
+									embed={formValues.type === "embed" ? previewEmbed : null}
 									guildData={guildData as GuildData}
 								/>
 							</div>

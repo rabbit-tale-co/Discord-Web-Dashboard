@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { ReactEditor } from "slate-react";
 import { Transforms } from "slate";
-import { getEditorInstance } from "@/components/ui/mention/mention-textarea-base";
+import { getEditorInstance } from "@/components/ui/mention/mention-textarea";
 
 /**
  * Default emoji categories to be used if none are provided

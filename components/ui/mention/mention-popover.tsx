@@ -6,6 +6,7 @@
  */
 
 import React, { useRef, useCallback } from "react";
+import { useParams } from "next/navigation";
 import {
 	Popover,
 	PopoverContent,
@@ -19,9 +20,10 @@ import {
 	CommandItem,
 	CommandInput,
 } from "@/components/ui/command";
-import { getEditorInstance, type MentionType } from "./mention-textarea-base";
+import type { MentionType } from "./mention-textarea-base";
 import { Editor, Transforms, Element as SlateElement } from "slate";
 import { ReactEditor } from "slate-react";
+import { getEditorInstance } from "../textarea";
 
 // Typing for role and channel data
 export interface Role {
@@ -67,6 +69,7 @@ interface MentionPopoverProps {
 	channels: Channel[];
 	variables: Variable[];
 	categories: Category[];
+	editorId?: string;
 	onMentionSelect: (
 		type: MentionType,
 		item: { id: string; name: string } | { name: string },
@@ -87,9 +90,25 @@ export function MentionPopover({
 	variables,
 	categories,
 	onMentionSelect,
+	editorId = "mention-textarea",
 }: MentionPopoverProps) {
+	// Get guildId from URL params
+	const params = useParams();
+	const guildId = params.guildId as string;
+
 	// Reference to the command input
 	const commandInputRef = useRef<HTMLInputElement>(null);
+
+	// Debug logging
+	// console.log("MentionPopover props:", {
+	// 	mentionType,
+	// 	searchValue,
+	// 	variables: variables.length,
+	// 	categories: categories.length,
+	// 	roles: roles.length,
+	// 	channels: channels.length,
+	// 	editorId,
+	// });
 
 	// Filter roles and channels based on search value
 	const filteredRoles = roles.filter((role) =>
@@ -104,58 +123,107 @@ export function MentionPopover({
 
 	// Handle popover close
 	const handlePopoverClose = useCallback(() => {
-		if (!open) return;
+		// Log the close event for debugging
+		// console.log("Handling popover close for editorId:", editorId);
 
-		// Remove any placeholder mentions
-		const editor = getEditorInstance("mention-textarea");
-		if (editor) {
-			try {
-				// Find and remove any mention placeholders in the document
-				const placeholders = Array.from(
-					Editor.nodes(editor, {
-						at: [],
-						match: (n) =>
-							SlateElement.isElement(n) &&
-							"type" in n &&
-							n.type === "mention-placeholder",
-					}),
-				);
-
-				// If there are any placeholders, remove them
-				if (placeholders.length > 0) {
-					for (const [_, placeholderPath] of placeholders) {
-						// Remove the placeholder
-						Transforms.removeNodes(editor, {
-							at: placeholderPath,
+		// Używamy requestAnimationFrame, aby upewnić się, że
+		// poniższy kod wykona się po zakończeniu bieżącego cyklu renderowania
+		requestAnimationFrame(() => {
+			// Remove any placeholder mentions
+			const editor = getEditorInstance(editorId);
+			if (editor) {
+				try {
+					// Find and remove any mention placeholders in the document
+					const placeholders = Array.from(
+						Editor.nodes(editor, {
+							at: [],
 							match: (n) =>
 								SlateElement.isElement(n) &&
 								"type" in n &&
 								n.type === "mention-placeholder",
-						});
-					}
-				}
+						}),
+					);
 
-				// Focus the editor
-				setTimeout(() => {
-					try {
-						ReactEditor.focus(editor);
-					} catch (e) {
-						console.error("Error focusing editor:", e);
-						const editorElement = document.querySelector('[role="textbox"]');
-						if (editorElement instanceof HTMLElement) {
-							editorElement.focus();
+					// console.log(
+					// 	`Found placeholders to remove in editorId ${editorId}:`,
+					// 	placeholders.length,
+					// );
+
+					// If there are any placeholders, remove them
+					if (placeholders.length > 0) {
+						// Najpierw upewnij się, że edytor ma focus
+						try {
+							ReactEditor.focus(editor);
+						} catch (e) {
+							console.error(
+								`Error focusing editor ${editorId} before removal:`,
+								e,
+							);
 						}
+
+						// Teraz usuń placeholdery
+						for (const [_, placeholderPath] of placeholders) {
+							// Remove the placeholder
+							Transforms.removeNodes(editor, {
+								at: placeholderPath,
+								match: (n) =>
+									SlateElement.isElement(n) &&
+									"type" in n &&
+									n.type === "mention-placeholder",
+							});
+						}
+
+						// Focus the editor again after a slightly longer delay
+						// to upewnić się, że focus pozostaje na edytorze
+						setTimeout(() => {
+							try {
+								// console.log(
+								// 	`Attempting to focus editor ${editorId} after placeholder removal`,
+								// );
+								ReactEditor.focus(editor);
+
+								// Dodatkowe zabezpieczenie - ustawienie kursora na końcu edytora
+								// co zapobiega "przeskakiwaniu" fokusu do następnego elementu
+								const point = Editor.end(editor, []);
+								Transforms.select(editor, point);
+							} catch (e) {
+								console.error(`Error focusing editor ${editorId}:`, e);
+								// Fallback dla sytuacji, gdy normalny focus nie zadziała
+								const editorElement = document.querySelector(
+									`[data-editor-id="${editorId}"]`,
+								);
+								if (editorElement instanceof HTMLElement) {
+									editorElement.focus();
+								} else {
+									// Ostateczny fallback - znajdź dowolny element edytora tekstowego
+									const anyTextbox = document.querySelector('[role="textbox"]');
+									if (anyTextbox instanceof HTMLElement) {
+										anyTextbox.focus();
+									}
+								}
+							}
+						}, 50); // Dłuższy timeout niż 0
 					}
-				}, 0);
-			} catch (error) {
-				console.error("Error removing placeholder:", error);
+				} catch (error) {
+					console.error(
+						`Error removing placeholder from editor ${editorId}:`,
+						error,
+					);
+				}
 			}
-		}
-	}, [open]);
+		});
+	}, [editorId]);
 
 	// Group variables by category
 	const groupedVariables = React.useMemo(() => {
 		const result: Record<string, Variable[]> = {};
+
+		// Debug logging
+		// console.log("Grouping variables:", {
+		// 	variables,
+		// 	categories,
+		// 	mentionType,
+		// });
 
 		// Initialize categories from the categories prop
 		for (const category of categories) {
@@ -170,23 +238,90 @@ export function MentionPopover({
 			result[variable.category].push(variable);
 		}
 
+		// console.log("Grouped variables result:", result);
+
 		return result;
-	}, [variables, categories]);
+	}, [variables, categories, mentionType]);
 
 	// Get all categories that have variables
 	const allCategories = React.useMemo(() => {
 		const categoriesWithVariables = new Set(variables.map((v) => v.category));
-		return categories.filter((c) => categoriesWithVariables.has(c.name));
+		const filteredCategories = categories.filter((c) =>
+			categoriesWithVariables.has(c.name),
+		);
+
+		// console.log("Categories with variables:", {
+		// 	categoriesWithVariables: Array.from(categoriesWithVariables),
+		// 	filteredCategories,
+		// });
+
+		return filteredCategories;
 	}, [variables, categories]);
+
+	// Obsługa wyboru wzmianki z popovera
+	const handleMentionSelect = useCallback(
+		(
+			type: MentionType,
+			item: { id: string; name: string } | { name: string },
+			range?: Range,
+		) => {
+			// Zamykanie popovera
+			onOpenChange(false);
+
+			// Usuwanie placeholderu, jeśli istnieje
+			if (editorId) {
+				const instance = getEditorInstance(editorId);
+				if (instance) {
+					try {
+						// Znajdź placeholder, jeśli istnieje
+						const placeholder = Array.from(
+							Editor.nodes(instance, {
+								at: [],
+								match: (n) =>
+									SlateElement.isElement(n) && n.type === "mention-placeholder",
+							}),
+						);
+
+						if (placeholder.length > 0) {
+							// Usuń placeholdery
+							for (const [_, path] of placeholder) {
+								Transforms.removeNodes(instance, { at: path });
+							}
+						}
+					} catch (error) {
+						console.error(
+							`Error removing placeholder from editor ${editorId}:`,
+							error,
+						);
+					}
+				}
+			}
+
+			// Formatowanie wartości wzmianki w zależności od typu
+			if (type === "role" && "id" in item) {
+				// Wywołujemy z bezpośrednim ID roli w formacie <@&ID>
+				onMentionSelect(type, item, range);
+			} else if (type === "channel" && "id" in item) {
+				// Wywołujemy z bezpośrednim ID kanału
+				onMentionSelect(type, item, range);
+			} else {
+				// Dla pozostałych przypadków przekazujemy element bez zmian
+				onMentionSelect(type, item, range);
+			}
+		},
+		[editorId, onMentionSelect, onOpenChange],
+	);
 
 	if (!anchor) return null;
 
 	return (
 		<Popover
 			open={open}
-			onOpenChange={(open) => {
-				onOpenChange(open);
-				if (!open) {
+			onOpenChange={(newOpen) => {
+				// console.log("Popover open change:", newOpen);
+				onOpenChange(newOpen);
+				// Wywołaj handlePopoverClose tylko przy zamykaniu, nie przy otwieraniu
+				if (!newOpen) {
 					handlePopoverClose();
 				}
 			}}
@@ -207,7 +342,8 @@ export function MentionPopover({
 			<PopoverContent
 				align="start"
 				sideOffset={5}
-				className="p-0 w-[220px] bg-white border border-gray-300 shadow-md rounded-md"
+				className="p-0 w-[220px] bg-white border border-gray-300 shadow-md rounded-md mentionPopover"
+				data-mention-popover="true"
 			>
 				<Command>
 					<CommandInput
@@ -227,7 +363,7 @@ export function MentionPopover({
 										key={role.id}
 										value={role.name}
 										onSelect={() => {
-											onMentionSelect(
+											handleMentionSelect(
 												mentionType,
 												role,
 												savedRange || undefined,
@@ -254,7 +390,7 @@ export function MentionPopover({
 										key={channel.id}
 										value={channel.name}
 										onSelect={() => {
-											onMentionSelect(
+											handleMentionSelect(
 												mentionType,
 												channel,
 												savedRange || undefined,
@@ -298,7 +434,7 @@ export function MentionPopover({
 													key={item.id}
 													value={item.name}
 													onSelect={() => {
-														onMentionSelect(
+														handleMentionSelect(
 															mentionType,
 															item,
 															savedRange || undefined,

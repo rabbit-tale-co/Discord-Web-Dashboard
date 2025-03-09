@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import type { MentionType } from "@/components/ui/mention/mention-textarea-base";
+import type { MentionType } from "@/components/ui/mention/mention-textarea";
 import type { MentionAnchor } from "@/components/ui/mention/mention-popover";
 
 interface MentionStartData {

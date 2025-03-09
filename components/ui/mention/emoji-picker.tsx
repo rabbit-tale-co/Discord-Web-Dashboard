@@ -66,7 +66,12 @@ export function EmojiPicker({
 					<SmileIcon className="size-4" />
 				</Button>
 			</PopoverTrigger>
-			<PopoverContent className="p-0" side={side} align={align}>
+			<PopoverContent
+				className="p-0"
+				side={side}
+				align={align}
+				data-emoji-picker="true"
+			>
 				<Command className="w-[320px]">
 					<CommandInput placeholder="Search emoji..." className="h-9" />
 					<CommandList className="max-h-[300px]">

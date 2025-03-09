@@ -4,24 +4,39 @@
  * This index file exports all mention-related components for easier imports
  */
 
-// Base Components
-export * from "./mention-textarea-base";
-export * from "./mention-popover";
-export * from "./emoji-picker";
-export * from "./mention-textarea";
-
-// Re-export types for convenience
+// Export types and components from mention-utils
 export type {
 	MentionType,
-	MentionElement,
-	CustomElement,
-	MentionPlaceholderElement,
-} from "./mention-textarea-base";
-
-export type {
-	MentionAnchor,
 	Role,
 	Channel,
 	Variable,
 	Category,
-} from "./mention-popover";
+	MentionRendererProps,
+	ExtendedGuildData,
+} from "./mention-utils";
+
+export {
+	UserMention,
+	RoleMention,
+	ChannelMention,
+	VariableMention,
+	MentionRenderer,
+	getUsernameFromId,
+	getRoleNameFromId,
+	getChannelNameFromId,
+	extractMentionsFromText,
+} from "./mention-utils";
+
+// Export core components
+export { MentionTextarea } from "./mention-textarea";
+export { MentionPopover } from "./mention-popover";
+export { EmojiPicker } from "./emoji-picker";
+
+// Export types from textarea base
+export type {
+	MentionElement,
+	MentionType as MentionTypeEnum,
+} from "./mention-textarea";
+
+// Re-export from the formatter hook
+export { useMentionFormatter, Mention } from "@/hooks/use-mention-formatter";

@@ -602,9 +602,15 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
 											</Select>
 											{colorMode === "hsl" && (
 												<React.Fragment>
-													<Button variant="secondary">H: {Math.round(hue)}</Button>
-													<Button variant="secondary">S: {Math.round(saturation)}</Button>
-													<Button variant="secondary">L: {Math.round(lightness)}</Button>
+													<Button variant="secondary">
+														H: {Math.round(hue)}
+													</Button>
+													<Button variant="secondary">
+														S: {Math.round(saturation)}
+													</Button>
+													<Button variant="secondary">
+														L: {Math.round(lightness)}
+													</Button>
 												</React.Fragment>
 											)}
 											{colorMode === "rgb" && (
@@ -829,16 +835,28 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
 												</Select>
 												{colorMode === "hsl" && (
 													<React.Fragment>
-														<Button variant="secondary">H: {Math.round(hue)}</Button>
-														<Button variant="secondary">S: {Math.round(saturation)}</Button>
-														<Button variant="secondary">L: {Math.round(lightness)}</Button>
+														<Button variant="secondary">
+															H: {Math.round(hue)}
+														</Button>
+														<Button variant="secondary">
+															S: {Math.round(saturation)}
+														</Button>
+														<Button variant="secondary">
+															L: {Math.round(lightness)}
+														</Button>
 													</React.Fragment>
 												)}
 												{colorMode === "rgb" && (
 													<React.Fragment>
-														<Button variant="secondary">R: {rgbValues.r}</Button>
-														<Button variant="secondary">G: {rgbValues.g}</Button>
-														<Button variant="secondary">B: {rgbValues.b}</Button>
+														<Button variant="secondary">
+															R: {rgbValues.r}
+														</Button>
+														<Button variant="secondary">
+															G: {rgbValues.g}
+														</Button>
+														<Button variant="secondary">
+															B: {rgbValues.b}
+														</Button>
 													</React.Fragment>
 												)}
 											</div>

@@ -1,24 +1,81 @@
+import { useFormContext } from "react-hook-form";
+import { TrashIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FormControl, FormItem } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
-import { MentionTextarea } from "@/components/ui/mention/mention-textarea";
-import { CircleMinus, Minus, Trash } from "lucide-react";
-import { toast } from "sonner";
-import {
-	useId,
-	useEffect,
-	useState,
-	useCallback,
-	useRef,
-	memo,
-	useMemo,
-} from "react";
-import type { UseFormReturn } from "react-hook-form";
-import { deepEqual } from "@/lib/deep-equal";
+import { useId, useEffect, useState, useCallback } from "react";
 import { FormField } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { ArrayField } from "./array-field";
+import type { GuildData } from "@/types/guild";
+import React from "react";
 
+import {
+	FormControl,
+	FormDescription,
+	FormLabel,
+	FormMessage,
+	FormItem,
+} from "@/components/ui/form";
+
+import type { Variable, Category } from "@/lib/types/discord";
+import type { Role, Channel } from "@/components/ui/mention/mention-popover";
+import { MessageField } from "./message-field";
+import { MentionTextarea } from "@/components/ui/mention/mention-textarea";
+// Default variables
+const defaultVariables: Variable[] = [
+	{
+		id: "user",
+		name: "user",
+		category: "mention",
+	},
+	{
+		id: "username",
+		name: "username",
+		category: "mention",
+	},
+	{
+		id: "server",
+		name: "server",
+		category: "mention",
+	},
+	{
+		id: "server_name",
+		name: "server_name",
+		category: "mention",
+	},
+	{
+		id: "server_image",
+		name: "server_image",
+		category: "mention",
+	},
+	{
+		id: "avatar",
+		name: "avatar",
+		category: "mention",
+	},
+];
+
+// Default categories
+const defaultCategories: Category[] = [
+	{
+		id: "mention",
+		name: "Mentions",
+		icon: "💬",
+	},
+];
+
+// Simple ID generation function
+function generateId(): string {
+	return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+}
+
+// Interface for window with additional data
+interface WindowWithVariables extends Window {
+	__guildData?: GuildData;
+	__welcomeVariables?: Variable[];
+	__variableCategories?: Category[];
+}
+
+// Interface for embed field
 interface EmbedField {
 	name: string;
 	value: string;
@@ -26,229 +83,117 @@ interface EmbedField {
 	_id: string;
 }
 
-type FormValues = Record<string, unknown>;
-
+// Interface for component props
 interface EmbedFieldsEditorProps {
 	name: string;
 	label: string;
 	description?: string;
 }
 
-// Optimized function for comparing embed fields efficiently
-const areEmbedFieldsEqual = (a: EmbedField, b: EmbedField): boolean => {
-	return (
-		a.name === b.name &&
-		a.value === b.value &&
-		a.inline === b.inline &&
-		a._id === b._id
-	);
-};
-
-// Optimized component for field items with improved memoization
-const EmbedFieldItem = memo(
-	({
-		embedField,
-		index,
-		guildId,
-		onUpdate,
-		onRemove,
-	}: {
-		embedField: EmbedField;
-		index: number;
-		guildId: string;
-		onUpdate: (
-			index: number,
-			key: keyof EmbedField,
-			value: string | boolean,
-		) => void;
-		onRemove: (index: number) => void;
-	}) => {
-		// Optimized event handlers with stable references
-		const handleNameChange = useCallback(
-			(value: string) => {
-				onUpdate(index, "name", value);
-			},
-			[index, onUpdate],
-		);
-
-		const handleValueChange = useCallback(
-			(value: string) => {
-				onUpdate(index, "value", value);
-			},
-			[index, onUpdate],
-		);
-
-		const handleInlineChange = useCallback(
-			(checked: boolean) => {
-				onUpdate(index, "inline", checked);
-			},
-			[index, onUpdate],
-		);
-
-		const handleRemove = useCallback(() => {
-			onRemove(index);
-		}, [index, onRemove]);
-
-		// Memoize props passed to child components to prevent unnecessary renders
-		const nameValue = useMemo(() => embedField.name, [embedField.name]);
-		const fieldValue = useMemo(() => embedField.value, [embedField.value]);
-		const inlineValue = useMemo(() => embedField.inline, [embedField.inline]);
-
-		return (
-			<div
-				key={embedField._id}
-				className="border p-2 rounded-md flex flex-col gap-2"
-			>
-				<div className="flex items-center gap-2">
-					<div className="flex-1">
-						<MentionTextarea
-							placeholder="Field name"
-							value={nameValue}
-							onChange={handleNameChange}
-							singleLine
-							showEmojiPicker={true}
-							maxLength={50}
-						/>
-						{/* <div className="text-xs text-muted-foreground text-right mt-1">
-							{nameValue.replace(/<[^>]*>/g, "").length}/50
-						</div> */}
-					</div>
-				</div>
-				<MentionTextarea
-					placeholder="Field value"
-					value={fieldValue}
-					onChange={handleValueChange}
-					singleLine={false}
-					showEmojiPicker={true}
-					maxLength={1024}
-					rows={6}
-				/>
-				<div className="text-xs text-muted-foreground text-right mt-1">
-					{fieldValue.replace(/<[^>]*>/g, "").length}/1024
-				</div>
-				<div className="flex items-center justify-between">
-					<FormField
-						name={`${guildId}.${index}.inline`}
-						render={({ field }) => (
-							<FormItem className="flex items-center space-x-2">
-								<FormControl>
-									<Switch
-										checked={field.value}
-										onCheckedChange={field.onChange}
-									/>
-								</FormControl>
-								<label className="text-sm font-medium leading-none">
-									Inline field
-								</label>
-							</FormItem>
-						)}
-					/>
-					<Button
-						variant="destructive"
-						size="icon"
-						onClick={handleRemove}
-						className="h-8 w-8"
-					>
-						<Trash className="h-4 w-4" />
-					</Button>
-				</div>
-			</div>
-		);
-	},
-	// Custom comparison function optimized for performance
-	(prevProps, nextProps) => {
-		return (
-			prevProps.index === nextProps.index &&
-			prevProps.guildId === nextProps.guildId &&
-			areEmbedFieldsEqual(prevProps.embedField, nextProps.embedField)
-		);
-	},
-);
-
-// Set displayName for React DevTools
-EmbedFieldItem.displayName = "EmbedFieldItem";
-
+/**
+ * Component for rendering the embed field editor
+ */
 export function EmbedFieldsEditor({
 	name,
 	label,
 	description,
 }: EmbedFieldsEditorProps) {
+	const { control, getValues, setValue } = useFormContext();
+	const [variables, setVariables] = useState<Variable[]>([]);
+	const [categories, setCategories] = useState<Category[]>([]);
+
+	// Render each embed field
 	const renderEmbedField = (index: number, remove: (index: number) => void) => (
-		<div className="space-y-4 w-full">
-			<FormField
-				name={`${name}.${index}.name`}
-				render={({ field }) => (
-					<FormItem>
+		<FormField
+			key={`${name}.${index}`}
+			control={control}
+			name={`${name}.${index}`}
+			render={({ field }) => {
+				const embedField = field.value as EmbedField;
+				return (
+					<FormItem className="space-y-2">
+						<div className="flex items-center justify-between">
+							<FormLabel>{`Field ${index + 1}`}</FormLabel>
+							<Button
+								type="button"
+								variant="ghost"
+								className="h-8 px-2"
+								onClick={() => remove(index)}
+							>
+								<TrashIcon className="h-4 w-4" />
+							</Button>
+						</div>
 						<FormControl>
-							<MentionTextarea
-								placeholder="Field name"
-								value={field.value}
-								onChange={field.onChange}
-								singleLine={true}
-								showEmojiPicker={true}
-								maxLength={50}
-							/>
+							<div className="space-y-2">
+								{/* Field Name */}
+								<FormItem>
+									<FormControl>
+										<MentionTextarea
+											value={embedField.name}
+											placeholder="Field name"
+											singleLine
+											showEmojiPicker={false}
+											maxLength={100}
+											variables={variables}
+											categories={categories}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+
+								{/* Field Value */}
+								<FormItem>
+									<FormControl>
+										<MentionTextarea
+											value={embedField.value}
+											placeholder="Field value"
+											rows={3}
+											showEmojiPicker={false}
+											maxLength={1024}
+											variables={variables}
+											categories={categories}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+
+								{/* Inline Toggle */}
+								<div className="flex items-center space-x-2">
+									<Switch id={`inline-${index}`} checked={embedField.inline} />
+									<label
+										htmlFor={`inline-${index}`}
+										className="text-sm font-medium leading-none cursor-pointer"
+									>
+										Inline field
+									</label>
+								</div>
+							</div>
 						</FormControl>
-						{/* <div className="text-xs text-muted-foreground text-right mt-1">
-							{field.value ? field.value.replace(/<[^>]*>/g, "").length : 0}/50
-						</div> */}
 					</FormItem>
-				)}
-			/>
-			<FormField
-				name={`${name}.${index}.value`}
-				render={({ field }) => (
-					<FormItem>
-						<FormControl>
-							<MentionTextarea
-								placeholder="Field value"
-								value={field.value}
-								onChange={field.onChange}
-								singleLine={false}
-								showEmojiPicker={true}
-								maxLength={1024}
-							/>
-						</FormControl>
-						{/* <div className="text-xs text-muted-foreground text-right mt-1">
-							{field.value ? field.value.replace(/<[^>]*>/g, "").length : 0}
-							/1024
-						</div> */}
-					</FormItem>
-				)}
-			/>
-			<div className="flex items-center justify-between">
-				<FormField
-					name={`${name}.${index}.inline`}
-					render={({ field }) => (
-						<FormItem className="flex items-center space-x-2">
-							<FormControl>
-								<Switch
-									checked={field.value}
-									onCheckedChange={field.onChange}
-								/>
-							</FormControl>
-							<label className="text-sm font-medium leading-none">
-								Inline field
-							</label>
-						</FormItem>
-					)}
-				/>
-				<Button variant="ghost" size="iconSm" onClick={() => remove(index)}>
-					<CircleMinus className="size-4" />
-				</Button>
-			</div>
-		</div>
+				);
+			}}
+		/>
 	);
 
 	return (
-		<ArrayField
-			name={name}
-			label={label}
-			description={description}
-			renderItem={renderEmbedField}
-			addButtonText="Add Field"
-			defaultValue={{ name: "", value: "", inline: false }}
-			cardClassName="overflow-hidden"
-		/>
+		<div className="space-y-4">
+			<div className="space-y-1">
+				{label && <FormLabel>{label}</FormLabel>}
+				{description && <FormDescription>{description}</FormDescription>}
+			</div>
+
+			<ArrayField
+				name={name}
+				label="Add Field"
+				description=""
+				renderItem={renderEmbedField}
+				defaultValue={{
+					name: "",
+					value: "",
+					inline: false,
+					_id: generateId(),
+				}}
+			/>
+		</div>
 	);
 }
