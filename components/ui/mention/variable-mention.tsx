@@ -1,7 +1,8 @@
 import { CommandItem } from "@/components/ui/command";
 import { Editor, Transforms, Element as SlateElement } from "slate";
 import { ReactEditor } from "slate-react";
-import type { Variable } from "@/lib/variables";
+import type { Variable } from "@/components/ui/mention/mention-popover";
+import type { MentionElement, VariableMentionElement } from "./types";
 
 interface VariableMentionProps {
 	variable: Variable;
@@ -25,14 +26,15 @@ export function VariableMention({
 				const [node, path] = placeholderEntry;
 
 				// Replace the placeholder with mention in a single operation
-				Transforms.setNodes(
+				Transforms.setNodes<VariableMentionElement>(
 					editor,
 					{
 						type: "mention",
 						mentionType: "variable",
 						value: `{${variable.id}}`,
+						displayValue: variable.name,
 						children: [{ text: "" }],
-					},
+					} as VariableMentionElement,
 					{ at: path },
 				);
 
@@ -42,11 +44,36 @@ export function VariableMention({
 					Transforms.select(editor, after);
 					ReactEditor.focus(editor);
 				}
+			} else {
+				// If no placeholder found, try to insert at current selection
+				console.warn("No placeholder found, inserting at selection");
+				Transforms.insertNodes(editor, {
+					type: "mention",
+					mentionType: "variable",
+					value: `{${variable.id}}`,
+					displayValue: variable.name,
+					children: [{ text: "" }],
+				} as VariableMentionElement);
+				ReactEditor.focus(editor);
 			}
 		} catch (err) {
 			console.error("Error handling mention selection:", err);
+			// Try to clean up any placeholders
+			try {
+				const [placeholderEntry] = Editor.nodes(editor, {
+					match: (n) =>
+						SlateElement.isElement(n) && n.type === "mention-placeholder",
+				});
+				if (placeholderEntry) {
+					const [_, path] = placeholderEntry;
+					Transforms.removeNodes(editor, { at: path });
+				}
+			} catch (cleanupErr) {
+				console.error("Error cleaning up:", cleanupErr);
+			}
+		} finally {
+			onSelect();
 		}
-		onSelect();
 	};
 
 	return (

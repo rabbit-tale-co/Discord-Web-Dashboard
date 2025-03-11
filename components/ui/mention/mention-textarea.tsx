@@ -18,7 +18,7 @@ import {
 	createEditor,
 	Node as SlateNode,
 } from "slate";
-import { Slate, Editable, withReact, type ReactEditor } from "slate-react";
+import { Slate, Editable, withReact, ReactEditor } from "slate-react";
 import { withHistory } from "slate-history";
 import { useParams } from "next/navigation";
 import DOMPurify from "dompurify";
@@ -296,6 +296,14 @@ export function MentionTextarea({
 	// Track the initial mount to avoid unnecessary resets
 	const initialMountRef = useRef(true);
 
+	// Store onMentionEnd in a ref to avoid dependency issues
+	const onMentionEndRef = useRef(onMentionEnd);
+
+	// Update the ref when onMentionEnd changes
+	useEffect(() => {
+		onMentionEndRef.current = onMentionEnd;
+	}, [onMentionEnd]);
+
 	useEffect(() => {
 		// Set mounted flag
 		isMounted.current = true;
@@ -440,6 +448,56 @@ export function MentionTextarea({
 		anchor: { x: number; y: number } | null;
 	} | null>(null);
 
+	// Helper function to remove all mention placeholders with improved error handling
+	const removeAllPlaceholders = useCallback(() => {
+		try {
+			// Use a more direct approach to find all placeholders
+			const placeholders = Array.from(
+				Editor.nodes(editor, {
+					at: [], // Search the entire document
+					match: (n) =>
+						SlateElement.isElement(n) && n.type === "mention-placeholder",
+					mode: "all",
+				}),
+			);
+
+			// If we found any placeholders, remove them from last to first
+			if (placeholders.length > 0) {
+				console.log(`Found ${placeholders.length} placeholders to remove`);
+
+				// Remove all placeholders from last to first to avoid path issues
+				for (let i = placeholders.length - 1; i >= 0; i--) {
+					const [_, path] = placeholders[i];
+					console.log(`Removing placeholder at path: ${path.join(",")}`);
+					Transforms.removeNodes(editor, { at: path });
+				}
+
+				// Force a normalization of the editor
+				Editor.normalize(editor, { force: true });
+
+				// Ensure focus is maintained
+				ReactEditor.focus(editor);
+			} else {
+				console.log("No placeholders found to remove");
+			}
+		} catch (err) {
+			console.error("Error removing placeholders:", err);
+		}
+	}, [editor]);
+
+	// Create a function to safely close the popover and clean up
+	const closePopover = useCallback(() => {
+		if (mentionPopover) {
+			console.log("Closing popover and cleaning up");
+			// First remove placeholders
+			removeAllPlaceholders();
+			// Then close the popover
+			setMentionPopover(null);
+			// Then call the callback
+			onMentionEnd?.();
+		}
+	}, [mentionPopover, removeAllPlaceholders, onMentionEnd]);
+
 	// Helper function to calculate accurate anchor position
 	const getAnchorPosition = useCallback(() => {
 		const selection = window.getSelection();
@@ -500,7 +558,7 @@ export function MentionTextarea({
 		[editor],
 	);
 
-	// Update handleKeyDown to use anchor position
+	// Update handleKeyDown to use ReactEditor.focus
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent<HTMLDivElement>) => {
 			// If single line and press Enter, prevent new line:
@@ -512,22 +570,7 @@ export function MentionTextarea({
 			// If pressing Escape and we have a mention popover open, close it
 			if (e.key === "Escape" && mentionPopover) {
 				e.preventDefault();
-				// Remove any existing mention placeholders
-				try {
-					const [placeholderEntry] = Editor.nodes(editor, {
-						match: (n) =>
-							SlateElement.isElement(n) && n.type === "mention-placeholder",
-					});
-
-					if (placeholderEntry) {
-						const [_, path] = placeholderEntry;
-						Transforms.removeNodes(editor, { at: path });
-					}
-				} catch (err) {
-					console.error("Error removing placeholder:", err);
-				}
-				setMentionPopover(null);
-				onMentionEnd?.();
+				closePopover();
 				return;
 			}
 
@@ -548,7 +591,10 @@ export function MentionTextarea({
 
 					// Get the current selection
 					const { selection } = editor;
-					if (!selection) return;
+					if (!selection) {
+						ReactEditor.focus(editor);
+						return;
+					}
 
 					// Insert a new placeholder with the trigger character
 					Transforms.insertNodes(editor, {
@@ -576,10 +622,10 @@ export function MentionTextarea({
 		[
 			singleLine,
 			onMentionStart,
-			onMentionEnd,
 			editor,
 			mentionPopover,
 			getAnchorPosition,
+			closePopover,
 		],
 	);
 
@@ -642,16 +688,14 @@ export function MentionTextarea({
 								});
 
 								if (placeholderEntry) {
-									const [node, path] = placeholderEntry;
-									// Just remove the placeholder when closing without selection
+									const [_, path] = placeholderEntry;
 									Transforms.removeNodes(editor, { at: path });
-									editor.focus();
+									ReactEditor.focus(editor);
 								}
 							} catch (err) {
 								console.error("Error removing placeholder:", err);
 							}
-							setMentionPopover(null);
-							onMentionEnd?.();
+							closePopover();
 						}
 					}}
 				>
@@ -681,8 +725,22 @@ export function MentionTextarea({
 									if (e.key === "Escape") {
 										e.preventDefault();
 										e.stopPropagation();
-										setMentionPopover(null);
-										onMentionEnd?.();
+										try {
+											const [placeholderEntry] = Editor.nodes(editor, {
+												match: (n) =>
+													SlateElement.isElement(n) &&
+													n.type === "mention-placeholder",
+											});
+
+											if (placeholderEntry) {
+												const [_, path] = placeholderEntry;
+												Transforms.removeNodes(editor, { at: path });
+												ReactEditor.focus(editor);
+											}
+										} catch (err) {
+											console.error("Error removing placeholder:", err);
+										}
+										closePopover();
 									}
 								}}
 							/>
@@ -702,7 +760,7 @@ export function MentionTextarea({
 														});
 
 														if (placeholderEntry) {
-															const [node, path] = placeholderEntry;
+															const [_, path] = placeholderEntry;
 
 															// Replace the placeholder with mention in a single operation
 															Transforms.setNodes<MentionElement>(
@@ -710,7 +768,7 @@ export function MentionTextarea({
 																{
 																	type: "mention",
 																	mentionType: "role",
-																	value: `<@&${role.id}>`,
+																	value: role.id,
 																	displayValue: `@${role.name}`,
 																	children: [{ text: "" }],
 																} as MentionElement,
@@ -721,16 +779,44 @@ export function MentionTextarea({
 															const after = Editor.after(editor, path);
 															if (after) {
 																Transforms.select(editor, after);
-																editor.focus();
 															}
+															ReactEditor.focus(editor);
+														} else {
+															// If no placeholder found, try to insert at current selection
+															console.warn(
+																"No placeholder found, inserting at selection",
+															);
+															Transforms.insertNodes(editor, {
+																type: "mention",
+																mentionType: "role",
+																value: role.id,
+																displayValue: `@${role.name}`,
+																children: [{ text: "" }],
+															} as MentionElement);
+															ReactEditor.focus(editor);
 														}
 													} catch (err) {
 														console.error(
 															"Error handling mention selection:",
 															err,
 														);
+														// Try to clean up any placeholders
+														try {
+															const [placeholderEntry] = Editor.nodes(editor, {
+																match: (n) =>
+																	SlateElement.isElement(n) &&
+																	n.type === "mention-placeholder",
+															});
+															if (placeholderEntry) {
+																const [_, path] = placeholderEntry;
+																Transforms.removeNodes(editor, { at: path });
+															}
+														} catch (cleanupErr) {
+															console.error("Error cleaning up:", cleanupErr);
+														}
+													} finally {
+														closePopover();
 													}
-													setMentionPopover(null);
 												}}
 											>
 												@{role.name}
@@ -752,7 +838,7 @@ export function MentionTextarea({
 														});
 
 														if (placeholderEntry) {
-															const [node, path] = placeholderEntry;
+															const [_, path] = placeholderEntry;
 
 															// Replace the placeholder with mention in a single operation
 															Transforms.setNodes<MentionElement>(
@@ -760,7 +846,7 @@ export function MentionTextarea({
 																{
 																	type: "mention",
 																	mentionType: "channel",
-																	value: `<#${channel.id}>`,
+																	value: channel.id,
 																	displayValue: `#${channel.name}`,
 																	children: [{ text: "" }],
 																} as MentionElement,
@@ -771,16 +857,44 @@ export function MentionTextarea({
 															const after = Editor.after(editor, path);
 															if (after) {
 																Transforms.select(editor, after);
-																editor.focus();
 															}
+															ReactEditor.focus(editor);
+														} else {
+															// If no placeholder found, try to insert at current selection
+															console.warn(
+																"No placeholder found, inserting at selection",
+															);
+															Transforms.insertNodes(editor, {
+																type: "mention",
+																mentionType: "channel",
+																value: channel.id,
+																displayValue: `#${channel.name}`,
+																children: [{ text: "" }],
+															} as MentionElement);
+															ReactEditor.focus(editor);
 														}
 													} catch (err) {
 														console.error(
 															"Error handling mention selection:",
 															err,
 														);
+														// Try to clean up any placeholders
+														try {
+															const [placeholderEntry] = Editor.nodes(editor, {
+																match: (n) =>
+																	SlateElement.isElement(n) &&
+																	n.type === "mention-placeholder",
+															});
+															if (placeholderEntry) {
+																const [_, path] = placeholderEntry;
+																Transforms.removeNodes(editor, { at: path });
+															}
+														} catch (cleanupErr) {
+															console.error("Error cleaning up:", cleanupErr);
+														}
+													} finally {
+														closePopover();
 													}
-													setMentionPopover(null);
 												}}
 											>
 												#{channel.name}
@@ -797,7 +911,7 @@ export function MentionTextarea({
 													});
 
 													if (placeholderEntry) {
-														const [node, path] = placeholderEntry;
+														const [_, path] = placeholderEntry;
 
 														// Replace the placeholder with mention in a single operation
 														Transforms.setNodes<MentionElement>(
@@ -805,7 +919,7 @@ export function MentionTextarea({
 															{
 																type: "mention",
 																mentionType: "channel",
-																value: "<id:customize>",
+																value: "customize",
 																displayValue: "Roles & Channels",
 																children: [{ text: "" }],
 															} as MentionElement,
@@ -816,16 +930,44 @@ export function MentionTextarea({
 														const after = Editor.after(editor, path);
 														if (after) {
 															Transforms.select(editor, after);
-															editor.focus();
 														}
+														ReactEditor.focus(editor);
+													} else {
+														// If no placeholder found, try to insert at current selection
+														console.warn(
+															"No placeholder found, inserting at selection",
+														);
+														Transforms.insertNodes(editor, {
+															type: "mention",
+															mentionType: "channel",
+															value: "customize",
+															displayValue: "Roles & Channels",
+															children: [{ text: "" }],
+														} as MentionElement);
+														ReactEditor.focus(editor);
 													}
 												} catch (err) {
 													console.error(
 														"Error handling mention selection:",
 														err,
 													);
+													// Try to clean up any placeholders
+													try {
+														const [placeholderEntry] = Editor.nodes(editor, {
+															match: (n) =>
+																SlateElement.isElement(n) &&
+																n.type === "mention-placeholder",
+														});
+														if (placeholderEntry) {
+															const [_, path] = placeholderEntry;
+															Transforms.removeNodes(editor, { at: path });
+														}
+													} catch (cleanupErr) {
+														console.error("Error cleaning up:", cleanupErr);
+													}
+												} finally {
+													closePopover();
 												}
-												setMentionPopover(null);
 											}}
 										>
 											Roles & Channels
@@ -852,7 +994,7 @@ export function MentionTextarea({
 													key={variable.id}
 													variable={variable}
 													editor={editor}
-													onSelect={() => setMentionPopover(null)}
+													onSelect={() => closePopover()}
 												/>
 											))}
 										</CommandGroup>
