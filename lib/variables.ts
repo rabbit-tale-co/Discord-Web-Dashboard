@@ -1,7 +1,16 @@
-import type {
-	Variable,
-	Category,
-} from "@/components/ui/mention/mention-popover";
+export interface Variable {
+	id: string;
+	name: string;
+	description?: string;
+	example?: string;
+	category: string;
+}
+
+export interface Category {
+	id: string;
+	name: string;
+	icon: string;
+}
 
 export const globalVariables: Variable[] = [
 	{

@@ -8,7 +8,7 @@ import { MentionRenderer } from "@/components/ui/mention";
 import type { ExtendedGuildData, Channel } from "@/components/ui/mention";
 import { cn } from "@/lib/utils";
 import { CheckIcon, ImageIcon } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import type * as Discord from "discord.js";
 import Image from "next/image";
 import type { ReactElement, ReactNode } from "react";
@@ -157,7 +157,22 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 	const isMounted = useRef(true);
 
 	// Store the last value to prevent loss during tab switching
-	const lastValueRef = useRef(embed);
+	const lastValueRef = useRef<Discord.APIEmbed | null>(null);
+
+	// Track when embed/userData/guildData last changed to help force refreshes
+	const lastDataRef = useRef<{
+		embedId: string;
+		userData: Discord.User | null;
+		guildId: string;
+		channels: Array<Channel>;
+		roles: Array<{ id: string; name: string }>;
+	}>({
+		embedId: "",
+		userData: null,
+		guildId: "",
+		channels: [],
+		roles: [],
+	});
 
 	// Track the initial mount to avoid unnecessary resets
 	const initialMountRef = useRef(true);
@@ -211,42 +226,216 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 		fetchUser();
 	}, []);
 
-	// Process embed content when component mounts or data changes
-	useEffect(() => {
-		if (!embed || !userData) return;
+	// Helper function to format text with variables
+	const formatTextVariables = (text: string): string => {
+		console.log("[formatTextVariables] input:", text);
 
-		try {
-			const processedData = {
-				...embed,
-				title: embed.title ? formatTextVariables(embed.title, true) : undefined,
-				description: embed.description
-					? formatTextVariables(embed.description)
-					: undefined,
-				fields: embed.fields
-					?.map((field) => ({
-						name: field.name ? formatTextVariables(field.name) : field.name,
-						value: field.value ? formatTextVariables(field.value) : field.value,
-						inline: field.inline,
-					}))
-					.filter(
-						(field): field is NonNullable<typeof field> =>
-							field.name !== undefined && field.value !== undefined,
-					),
-				footer: embed.footer
-					? {
-							text: formatTextVariables(embed.footer.text),
-						}
-					: undefined,
-			};
+		if (!text) return "";
 
-			setProcessedEmbed(processedData);
-		} catch (error) {
-			console.error("Error processing embed content:", error);
-			setProcessedEmbed(embed);
-		}
-	}, [embed, userData]);
+		// Handle the special <id:customize> format for the Roles & Channels option
+		let processedText = text.replace(/<id:customize>/g, (match) => {
+			console.log("[formatTextVariables] Processing customize mention");
+			const span = `<span class="mention customize-mention" data-mention-type="channel" data-mention-value="customize">Roles & Channels</span>`;
+			console.log(
+				"[formatTextVariables] Created customize mention span:",
+				span,
+			);
+			return span;
+		});
 
-	if (!processedEmbed || !userData) return null;
+		// Next handle Discord-style mentions: <#channelId>, <@userId>, <@&roleId>
+		processedText = processedText.replace(
+			/<(#|@|@&)(\d+)>/g,
+			(match, type, id) => {
+				console.log("[formatTextVariables] Processing Discord-style mention:", {
+					type,
+					id,
+				});
+
+				let mentionType = "unknown";
+				let displayText = id;
+
+				switch (type) {
+					case "#": {
+						// Channel mention
+						mentionType = "channel";
+						// Always use the latest channels data
+						const channel = channels.find((c) => c.id === id);
+						displayText = channel?.name || id;
+						console.log("[formatTextVariables] Channel mention:", {
+							id,
+							name: displayText,
+						});
+						break;
+					}
+					case "@": {
+						// User mention
+						mentionType = "user";
+						break;
+					}
+					case "@&": {
+						// Role mention
+						mentionType = "role";
+						// Always use the latest roles data
+						const role = roles.find((r) => r.id === id);
+						displayText = role?.name || id;
+						break;
+					}
+				}
+
+				// Create appropriate mention span
+				const span = `<span class="mention" data-mention-type="${mentionType}" data-mention-value="${id}">${type === "#" ? "#" : "@"}${displayText}</span>`;
+				console.log(
+					"[formatTextVariables] Created Discord-style mention span:",
+					span,
+				);
+				return span;
+			},
+		);
+
+		// Now handle variable replacements as before
+		processedText = processedText.replace(
+			/\{([^{}]+)\}/g,
+			(match, variable) => {
+				console.log("[formatTextVariables] Processing variable:", variable);
+
+				// Always get fresh values from latest state
+				let value = "";
+
+				switch (variable) {
+					case "server_name": {
+						value = guildData?.name || "Server";
+						console.log(
+							"[formatTextVariables] server_name value:",
+							value,
+							"guildData:",
+							guildData?.name,
+						);
+						break;
+					}
+					case "server_id": {
+						value = guildData?.id || "Unknown";
+						console.log("[formatTextVariables] server_id value:", value);
+						break;
+					}
+					case "member_count": {
+						value =
+							guildData?.guild_details?.approximate_member_count?.toString() ||
+							"0";
+						console.log("[formatTextVariables] member_count value:", value);
+						break;
+					}
+					case "user":
+					case "user.username": {
+						value = userData?.username || "user";
+						console.log(
+							"[formatTextVariables] user variable. userData:",
+							userData,
+							"value:",
+							value,
+						);
+						break;
+					}
+					default: {
+						value = variable;
+						console.log(
+							"[formatTextVariables] default variable:",
+							variable,
+							"value:",
+							value,
+						);
+						break;
+					}
+				}
+
+				// Ensure we have a properly formatted mention span with correct attributes
+				const span = `<span class="mention" data-mention-type="variable" data-mention-value="${variable}">${value}</span>`;
+				console.log("[formatTextVariables] Created mention span:", span);
+				return span;
+			},
+		);
+
+		console.log("[formatTextVariables] result:", processedText);
+		return processedText;
+	};
+
+	// Function to process variables and mentions in text
+	const processVariables = useCallback(
+		(text: string, isTitle = false): string => {
+			if (!text) return "";
+
+			console.log("[processVariables] input:", text, "isTitle:", isTitle);
+
+			// First, handle direct variable replacements for display in the preview
+			const processedText = text.replace(/\{([^{}]+)\}/g, (match, variable) => {
+				console.log("[processVariables] Processing variable:", variable);
+
+				// Always get fresh values from latest state
+				let value = "";
+
+				switch (variable) {
+					case "server_name": {
+						value = guildData?.name || "Server";
+						console.log(
+							"[processVariables] server_name value:",
+							value,
+							"guildData:",
+							guildData?.name,
+						);
+						break;
+					}
+					case "server_id": {
+						value = guildData?.id || "Unknown";
+						console.log("[processVariables] server_id value:", value);
+						break;
+					}
+					case "member_count": {
+						value =
+							guildData?.guild_details?.approximate_member_count?.toString() ||
+							"0";
+						console.log("[processVariables] member_count value:", value);
+						break;
+					}
+					case "user":
+					case "user.username": {
+						value = userData?.username || "user";
+						console.log(
+							"[processVariables] user variable. userData:",
+							userData,
+							"value:",
+							value,
+						);
+						break;
+					}
+					default: {
+						value = match;
+						console.log(
+							"[processVariables] default variable:",
+							variable,
+							"value:",
+							value,
+						);
+						break;
+					}
+				}
+
+				if (isTitle) {
+					return value;
+				}
+
+				// For non-title text, wrap in a formatted span
+				return `<span data-slate-node="element" data-slate-inline="true" data-slate-void="true" contenteditable="false" class="rounded-md px-1.5 py-0.5 text-sm select-all border cursor-default font-medium bg-amber-100 text-amber-800 border-amber-300" data-mention-type="variable" data-mention-value="${variable}">${value}</span>`;
+			});
+
+			console.log(
+				"[processVariables] after variable replacement:",
+				processedText,
+			);
+
+			return processedText;
+		},
+		[userData, guildData],
+	);
 
 	// Helper function to format text with spans and markdown-like syntax
 	const formatText = (text: string) => {
@@ -370,440 +559,321 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 		return date.toLocaleString();
 	};
 
-	// Helper function to format text variables
-	const formatTextVariables = (text: string, isTitle = false): string => {
-		if (!text) return "";
-
-		// For title, only do basic variable replacements without formatting
-		if (isTitle) {
-			return text.replace(/{(.*?)}/g, (match, variable) => {
-				switch (variable) {
-					case "server_name":
-						return guildData?.name || "Server";
-					case "server_id":
-						return guildData?.id || "Unknown";
-					case "member_count":
-						return (
-							guildData?.guild_details?.approximate_member_count?.toString() ||
-							"0"
-						);
-					case "user":
-						return userData?.username || "user";
-					default:
-						return match;
-				}
-			});
-		}
-
-		// For non-title text, process with full mention formatting
-		const formattedText = text
-			// Handle user mentions <@123456789>
-			.replace(/<@!?(\d+)>/g, (match, id) => {
-				const username = id === userData?.id ? userData.username : "user";
-				return `<span data-type="user" data-value="${id}" class="mention">@${username}</span>`;
-			})
-			// Handle role mentions <@&123456789>
-			.replace(/<@&(\d+)>/g, (match, id) => {
-				const role = roles.find((r) => r.id === id);
-				return `<span data-type="role" data-value="${id}" class="mention">@${role?.name || "role"}</span>`;
-			})
-			// Handle channel mentions <#123456789>
-			.replace(/<#(\d+)>/g, (match, id) => {
-				const channel = channels.find((c) => c.id === id);
-				return `<span data-type="channel" data-value="${id}" class="mention">#${channel?.name || "channel"}</span>`;
-			})
-			// Handle custom emojis <:name:123456789>
-			.replace(/<:([^:]+):(\d+)>/g, (match, name, id) => {
-				return `<img src="https://cdn.discordapp.com/emojis/${id}.png" alt=":${name}:" class="emoji" />`;
-			})
-			// Handle animated emojis <a:name:123456789>
-			.replace(/<a:([^:]+):(\d+)>/g, (match, name, id) => {
-				return `<img src="https://cdn.discordapp.com/emojis/${id}.gif" alt=":${name}:" class="emoji" />`;
-			})
-			// Handle id:customize
-			.replace(/id:customize/g, () => {
-				return `<span data-type="customize" class="mention customize-mention">Roles & Channels</span>`;
-			})
-			// Handle timestamp <t:1234567890:R>
-			.replace(/<t:(\d+)(?::([RFTDR]))?\>/g, (match, timestamp, format) => {
-				const date = new Date(Number.parseInt(timestamp, 10) * 1000);
-				let formattedTime: string;
-				switch (format) {
-					case "R":
-						formattedTime = formatRelative(date);
-						break;
-					case "T":
-						formattedTime = formatTime(date);
-						break;
-					case "D":
-						formattedTime = formatDate(date);
-						break;
-					case "F":
-						formattedTime = formatFull(date);
-						break;
-					default:
-						formattedTime = date.toLocaleString();
-				}
-				return `<span class="timestamp">${formattedTime}</span>`;
-			});
-
-		// Then handle curly brace variables
-		return formattedText.replace(/{(.*?)}/g, (match, variable) => {
-			switch (variable) {
-				case "server_name":
-					return `<span data-type="server" data-value="${guildData?.id || ""}" class="mention">${guildData?.name || "Server"}</span>`;
-				case "server_id":
-					return guildData?.id || "Unknown";
-				case "member_count":
-					return (
-						guildData?.guild_details?.approximate_member_count?.toString() ||
-						"0"
-					);
-				case "user":
-					return userData ? `<@${userData.id}>` : "user";
-				default:
-					return match;
-			}
-		});
-	};
-
 	// Helper function to parse HTML content for title
 	const parseTitleContent = (content: string): ReactElement[] => {
-		const temp = document.createElement("div");
-		// Sanitize the HTML content before parsing
-		temp.innerHTML = DOMPurify.sanitize(content, {
-			ALLOWED_TAGS: ["span", "div", "p", "br", "b", "i", "u", "strong", "em"],
-			ALLOWED_ATTR: ["class", "data-type", "data-value", "contenteditable"],
-		});
+		if (!content) return [];
 
-		const processNode = (node: Node, key: string): ReactElement => {
-			if (node.nodeType === Node.TEXT_NODE) {
-				// Always wrap text nodes in a React fragment
-				return <Fragment key={key}>{node.textContent || ""}</Fragment>;
-			}
+		console.log("parseTitleContent input:", content);
 
-			if (node.nodeType === Node.ELEMENT_NODE) {
-				const element = node as Element;
-				const children = Array.from(element.childNodes).map((child, index) =>
-					processNode(child, `${key}-${index}`),
+		// First, apply direct variable replacements
+		const processedContent = processVariables(content, true);
+		console.log("parseTitleContent after processVariables:", processedContent);
+
+		// If the content includes variables in span format, we need to process them
+		if (content.includes('data-mention-type="variable"')) {
+			try {
+				console.log(
+					"Content contains variable mentions, processing with DOMPurify",
 				);
 
-				// Handle special elements like mentions
-				if (
-					element.tagName === "SPAN" &&
-					element.getAttribute("data-type") === "mention"
-				) {
-					return (
-						<span
-							key={key}
-							className="text-[#5865F2] bg-[#5865F21A] rounded px-1"
-							data-type={element.getAttribute("data-type")}
-							data-value={element.getAttribute("data-value")}
-						>
-							{element.textContent}
-						</span>
-					);
-				}
-
-				// Create React element based on tag name
-				const props: Record<string, string | undefined> = {
-					key,
-					className: element.className || undefined,
+				// Configure DOMPurify for variable processing
+				const config = {
+					ALLOWED_TAGS: [
+						"span",
+						"div",
+						"p",
+						"br",
+						"b",
+						"i",
+						"u",
+						"strong",
+						"em",
+						"code",
+						"del",
+					],
+					ALLOWED_ATTR: ["class", "data-mention-type", "data-mention-value"],
+					ADD_ATTR: ["data-mention-type", "data-mention-value"],
+					ALLOW_DATA_ATTR: true,
+					RETURN_DOM: true,
+					RETURN_DOM_FRAGMENT: true,
 				};
 
-				// Add any additional attributes that are needed
-				if (element.hasAttributes()) {
-					for (const attr of Array.from(element.attributes)) {
-						if (attr.name !== "class") {
-							// class is handled above
-							props[attr.name] = attr.value;
+				// Use DOMPurify to sanitize and create a DOM fragment
+				const fragment = DOMPurify.sanitize(
+					content,
+					config,
+				) as unknown as DocumentFragment;
+				console.log("DOMPurify output:", fragment);
+
+				// Find all variable mentions in the sanitized content
+				const variableMentions = fragment.querySelectorAll(
+					'span[data-mention-type="variable"]',
+				);
+				console.log("Found variable mentions:", variableMentions.length);
+
+				// Replace each variable mention with its actual value
+				for (const mention of variableMentions) {
+					const variableName = mention.getAttribute("data-mention-value");
+					console.log("Processing variable in title:", variableName);
+
+					if (variableName) {
+						let value = variableName; // Default to the variable name
+
+						// Get the appropriate value based on variable type
+						switch (variableName) {
+							case "server_name":
+								value = guildData?.name || "Server";
+								break;
+							case "server_id":
+								value = guildData?.id || "Unknown";
+								break;
+							case "member_count":
+								value =
+									guildData?.guild_details?.approximate_member_count?.toString() ||
+									"0";
+								break;
+							case "user":
+							case "user.username":
+								value = userData?.username || "user";
+								console.log(
+									"User variable detected in title. userData:",
+									userData,
+								);
+								break;
 						}
+
+						console.log(`Replacing ${variableName} with value:`, value);
+
+						// Replace the span with the text value
+						mention.textContent = value;
 					}
 				}
 
-				return React.createElement(
-					element.tagName.toLowerCase(),
-					props,
-					...children,
-				);
+				// Convert to plain text for the title
+				const plainText = fragment.textContent || "";
+				console.log("Final plain text for title:", plainText);
+
+				return [<span key="title-content">{plainText}</span>];
+			} catch (error) {
+				console.error("Error processing title mentions with DOMPurify:", error);
+				// Fallback - strip all HTML tags
+				const tempDiv = document.createElement("div");
+				tempDiv.innerHTML = content;
+				const plainText = tempDiv.textContent || tempDiv.innerText || "";
+				console.log("Error fallback plain text:", plainText);
+				return [<span key="title-content">{plainText}</span>];
 			}
-
-			// Default case: return empty fragment
-			return <Fragment key={key} />;
-		};
-
-		// Generate unique keys for root nodes
-		const uniquePrefix = Math.random().toString(36).substring(2, 9);
-		return Array.from(temp.childNodes).map((node, index) =>
-			processNode(node, `title-${uniquePrefix}-${index}`),
-		);
+		} else {
+			console.log("No variable mentions found in spans, using processed text");
+			// Use the already processed content
+			return [<span key="title-content">{processedContent}</span>];
+		}
 	};
 
-	// Helper function to process DOM nodes and convert mentions to React elements
+	// Process DOM nodes to extract mentions and format text
 	const processNodes = (
 		parentNode: Element | DocumentFragment,
 	): ReactElement[] => {
 		const elements: ReactElement[] = [];
-		const textContent: string[] = [];
+		const uniqueId = Math.random().toString(36).substring(2, 9);
 
-		for (const node of Array.from(parentNode.childNodes)) {
+		// Process each child node
+		for (let i = 0; i < parentNode.childNodes.length; i++) {
+			const node = parentNode.childNodes[i];
+
 			if (node.nodeType === Node.TEXT_NODE) {
-				// Add text nodes directly
-				if (node.textContent) {
-					textContent.push(node.textContent);
+				// Handle text nodes
+				const text = node.textContent || "";
+				if (text.trim()) {
+					// Apply basic formatting to text nodes
+					const formattedText = formatText(text);
+					if (Array.isArray(formattedText)) {
+						elements.push(...formattedText);
+					} else {
+						elements.push(
+							<Fragment key={`text-${i}-${uniqueId}`}>{text}</Fragment>,
+						);
+					}
 				}
 			} else if (node.nodeType === Node.ELEMENT_NODE) {
-				// Process element nodes
-				const element = node as Element;
+				const element = node as HTMLElement;
 
-				// If there's accumulated text, process it first
-				if (textContent.length > 0) {
-					const processedTextElements = processTextContent(
-						textContent.join(""),
-					);
-					elements.push(...processedTextElements);
-					textContent.length = 0; // Clear the array
-				}
-
+				// Handle mention spans from the new MentionTextarea format
 				if (
 					element.tagName === "SPAN" &&
-					(element.classList.contains("mention") ||
-						element.hasAttribute("data-type") ||
-						element.getAttribute("contenteditable") === "false")
+					(element.getAttribute("data-type") === "mention" ||
+						element.hasAttribute("data-mention-type") ||
+						element.classList.contains("mention"))
 				) {
-					// Apply styling for mentions regardless of specific attributes
-					// This will catch all Discord-style mentions
+					// Extract mention type and value from the element
+					let mentionType =
+						element.getAttribute("data-mention-type") ||
+						element.getAttribute("data-type") ||
+						"variable";
+
+					// Check for data-mention-value first, then fall back to data-value
+					let value =
+						element.getAttribute("data-mention-value") ||
+						element.getAttribute("data-value") ||
+						"";
+
+					// Log what we found for debugging
+					console.log("Processing mention element:", {
+						mentionType,
+						value,
+						hasDataMentionValue: element.hasAttribute("data-mention-value"),
+						hasDataValue: element.hasAttribute("data-value"),
+						elementContent: element.textContent,
+						classList: Array.from(element.classList),
+					});
+
+					// Handle the customize case
+					if (
+						element.classList.contains("customize-mention") ||
+						mentionType === "customize" ||
+						value === "customize"
+					) {
+						mentionType = "channel";
+						value = "customize";
+						const mentionElement = renderMention(mentionType, value);
+						if (mentionElement) {
+							elements.push(mentionElement);
+							continue;
+						}
+					}
+
+					// Create the appropriate mention element
+					const mentionElement = renderMention(mentionType, value);
+					if (mentionElement) {
+						elements.push(mentionElement);
+					} else {
+						// Fallback if we couldn't render the mention
+						elements.push(
+							<span
+								key={`unknown-mention-${i}-${uniqueId}`}
+								className="text-[#5865F2] bg-[#5865F21A] rounded px-1 mention"
+							>
+								{element.textContent || value}
+							</span>,
+						);
+					}
+				} else if (element.tagName === "P" || element.tagName === "DIV") {
+					// Process paragraph or div elements
+					const childElements = processNodes(element);
+					if (childElements.length > 0) {
+						elements.push(
+							<Fragment key={`block-${i}-${uniqueId}`}>
+								{childElements}
+								{element.tagName === "P" && <br />}
+							</Fragment>,
+						);
+					}
+				} else if (element.tagName === "BR") {
+					// Handle line breaks
+					elements.push(<br key={`br-${i}-${uniqueId}`} />);
+				} else if (element.tagName === "STRONG" || element.tagName === "B") {
+					// Handle bold text
+					const childElements = processNodes(element);
 					elements.push(
-						<span
-							key={`styled-mention-${elements.length}`}
-							className="text-[#5865F2] bg-[#5865F21A] rounded px-1 mention"
+						<strong key={`bold-${i}-${uniqueId}`}>
+							{childElements.length > 0
+								? childElements
+								: element.textContent || ""}
+						</strong>,
+					);
+				} else if (element.tagName === "EM" || element.tagName === "I") {
+					// Handle italic text
+					const childElements = processNodes(element);
+					elements.push(
+						<em key={`italic-${i}-${uniqueId}`}>
+							{childElements.length > 0
+								? childElements
+								: element.textContent || ""}
+						</em>,
+					);
+				} else if (element.tagName === "U") {
+					// Handle underlined text
+					const childElements = processNodes(element);
+					elements.push(
+						<u key={`underline-${i}-${uniqueId}`}>
+							{childElements.length > 0
+								? childElements
+								: element.textContent || ""}
+						</u>,
+					);
+				} else if (element.tagName === "DEL" || element.tagName === "S") {
+					// Handle strikethrough text
+					const childElements = processNodes(element);
+					elements.push(
+						<del key={`strikethrough-${i}-${uniqueId}`}>
+							{childElements.length > 0
+								? childElements
+								: element.textContent || ""}
+						</del>,
+					);
+				} else if (element.tagName === "CODE") {
+					// Handle code text
+					const childElements = processNodes(element);
+					elements.push(
+						<code
+							key={`code-${i}-${uniqueId}`}
+							className="bg-muted px-1 py-0.5 rounded"
 						>
-							{element.textContent}
-						</span>,
+							{childElements.length > 0
+								? childElements
+								: element.textContent || ""}
+						</code>,
 					);
 				} else {
-					// Handle other elements recursively
+					// Process any other elements recursively
 					const childElements = processNodes(element);
-					elements.push(...childElements);
+					if (childElements.length > 0) {
+						elements.push(
+							<Fragment key={`other-${i}-${uniqueId}`}>
+								{childElements}
+							</Fragment>,
+						);
+					}
 				}
 			}
-		}
-
-		// Process any remaining text
-		if (textContent.length > 0) {
-			const processedTextElements = processTextContent(textContent.join(""));
-			elements.push(...processedTextElements);
 		}
 
 		return elements;
 	};
 
-	// Helper function to process text content and extract mentions
-	const processTextContent = (
-		text: string,
-		asFragment = false,
-	): ReactElement[] => {
-		// Create a unique identifier for this instance of processTextContent
-		const uniqueId = Math.random().toString(36).substring(2, 9);
-
-		const elements: ReactElement[] = [];
-		// Sanitize the input text
-		const sanitizedText = DOMPurify.sanitize(text, {
-			ALLOWED_TAGS: [], // Only allow text content
-			ALLOWED_ATTR: [],
-		});
-		const remainingText = sanitizedText;
-
-		// Special handling for user mentions with emojis
-		// Match patterns like @Tiny Rabbit 🐇
-		const specialUserRegex = /@([^<>]+)/g;
-		const specialUserMatches = Array.from(
-			sanitizedText.matchAll(specialUserRegex),
-		);
-
-		if (specialUserMatches.length > 0) {
-			let lastIndex = 0;
-
-			// Process text with special user mentions
-			for (const match of specialUserMatches) {
-				const fullMatch = match[0];
-				const position = match.index;
-
-				// Add text before this mention
-				if (position > lastIndex) {
-					const textBefore = text.substring(lastIndex, position);
-					elements.push(
-						<Fragment key={`text-before-user-${lastIndex}-${uniqueId}`}>
-							{textBefore}
-						</Fragment>,
-					);
-				}
-
-				// Add the special user mention with styling
-				elements.push(
-					<span
-						key={`user-emoji-${position}-${uniqueId}`}
-						className="text-[#5865F2] bg-[#5865F21A] rounded px-1 mention"
-					>
-						{fullMatch}
-					</span>,
-				);
-
-				// Update last index
-				lastIndex = position + fullMatch.length;
-			}
-
-			// Add remaining text after last mention
-			if (lastIndex < text.length) {
-				const textAfter = text.substring(lastIndex);
-				elements.push(
-					<Fragment key={`text-after-user-${lastIndex}-${uniqueId}`}>
-						{textAfter}
-					</Fragment>,
-				);
-			}
-
-			return asFragment && elements.length > 0
-				? [<Fragment key={`mention-fragment-${uniqueId}`}>{elements}</Fragment>]
-				: elements;
-		}
-
-		// Special handling for channel mentions with emojis
-		// Match patterns like #1️⃣ · faq or #🔑 · support-ticket
-		const specialChannelRegex = /#([^<>\s]+)\s*·\s*([^<>\s]+)/g;
-		const specialMatches = Array.from(text.matchAll(specialChannelRegex));
-
-		if (specialMatches.length > 0) {
-			let lastIndex = 0;
-
-			// Process text with special mentions
-			for (const match of specialMatches) {
-				const fullMatch = match[0];
-				const position = match.index;
-
-				// Add text before this mention
-				if (position > lastIndex) {
-					const textBefore = text.substring(lastIndex, position);
-					elements.push(
-						<Fragment key={`text-before-${lastIndex}`}>{textBefore}</Fragment>,
-					);
-				}
-
-				// Add the special channel mention with styling
-				elements.push(
-					<span
-						key={`channel-emoji-${position}`}
-						className="text-[#5865F2] bg-[#5865F21A] rounded px-1 mention"
-					>
-						{fullMatch}
-					</span>,
-				);
-
-				// Update last index
-				lastIndex = position + fullMatch.length;
-			}
-
-			// Add remaining text after last mention
-			if (lastIndex < text.length) {
-				const textAfter = text.substring(lastIndex);
-				elements.push(
-					<Fragment key={`text-after-${lastIndex}`}>{textAfter}</Fragment>,
-				);
-			}
-
-			return asFragment && elements.length > 0
-				? [<Fragment key="mention-fragment">{elements}</Fragment>]
-				: elements;
-		}
-
-		// Process Discord-style mentions if special ones weren't found
-		// Match Discord-style mentions like <@123456789>, <#123456789>, etc.
-		// Also match HTML entity encoded forms like &lt;@123456789&gt;, &lt;#123456789&gt;
-		const mentionRegex = /(?:<|&lt;)([@#])!?&?(\d+)(?:>|&gt;)/g;
-		const mentions: { type: string; id: string; position: number }[] = [];
-
-		// Use a do-while loop to avoid assignment in expression
-		let match: RegExpExecArray | null = mentionRegex.exec(text);
-		while (match !== null) {
-			mentions.push({
-				type: match[1] === "@" ? "user" : "channel",
-				id: match[2],
-				position: match.index,
-			});
-			match = mentionRegex.exec(text);
-		}
-
-		// Process mentions
-		if (mentions.length > 0) {
-			let lastIndex = 0;
-
-			// Sort mentions by position
-			mentions.sort((a, b) => a.position - b.position);
-
-			// Process text with mentions
-			for (const mention of mentions) {
-				// Add text before this mention
-				if (mention.position > lastIndex) {
-					const textBefore = text.substring(lastIndex, mention.position);
-					elements.push(
-						<Fragment key={`text-${lastIndex}`}>{textBefore}</Fragment>,
-					);
-				}
-
-				// Add the mention
-				const mentionElement = renderMention(mention.type, mention.id);
-				if (mentionElement) {
-					elements.push(mentionElement);
-				}
-
-				// Update last index - account for both HTML entity encoded and regular forms
-				const mentionText = text.substring(mention.position).startsWith("&lt;")
-					? mention.type === "user"
-						? `&lt;@${mention.id}&gt;`
-						: `&lt;#${mention.id}&gt;`
-					: mention.type === "user"
-						? `<@${mention.id}>`
-						: `<#${mention.id}>`;
-
-				lastIndex = mention.position + mentionText.length;
-			}
-
-			// Add remaining text after last mention
-			if (lastIndex < text.length) {
-				const textAfter = text.substring(lastIndex);
-				elements.push(
-					<Fragment key={`text-end-${lastIndex}`}>{textAfter}</Fragment>,
-				);
-			}
-
-			// Return the elements as a fragment if requested
-			return asFragment && elements.length > 0
-				? [<Fragment key="mention-fragment">{elements}</Fragment>]
-				: elements;
-		}
-
-		// No mentions found, just add the text
-		elements.push(
-			<Fragment key={`text-only-${Math.random().toString(36).substring(2, 9)}`}>
-				{text}
-			</Fragment>,
-		);
-
-		return asFragment && elements.length > 0
-			? [
-					<Fragment
-						key={`mention-fragment-${Math.random().toString(36).substring(2, 9)}`}
-					>
-						{elements}
-					</Fragment>,
-				]
-			: elements;
-	};
-
 	// Helper function to render a mention based on type and ID
 	const renderMention = (type: string, id: string): ReactElement | null => {
+		console.log(
+			"renderMention called with type:",
+			type,
+			"id:",
+			id || "<empty string>",
+		);
+
+		// Skip rendering if type or id is empty
+		if (!type || !id) {
+			console.log("Skipping mention rendering due to empty type or id");
+			return null;
+		}
+
 		if (type === "channel") {
+			// Special case for "customize" which is the Roles & Channels option
+			if (id === "customize") {
+				console.log("Rendering customize mention");
+				return (
+					<span
+						key="channel-customize"
+						className="text-[#5865F2] bg-[#5865F21A] rounded px-1 mention customize-mention"
+						data-mention-type="channel"
+						data-mention-value="customize"
+					>
+						Roles & Channels
+					</span>
+				);
+			}
+
 			const channel = channels.find((c) => c.id === id);
+			console.log("Rendering channel mention, found channel:", channel?.name);
 			return (
 				<span
 					key={`channel-${id}`}
@@ -816,16 +886,46 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 			);
 		}
 
-		if (type === "user" || type === "mention") {
-			// Handle user mentions
+		if (type === "variable") {
+			// Handle variable mentions
+			let displayText = id;
+
+			// Handle special variables
+			switch (id) {
+				case "user.username":
+				case "user":
+					displayText = userData?.username || "user";
+					console.log("Variable user/user.username, userData:", userData);
+					break;
+				case "server_name":
+					displayText = guildData?.name || "Server";
+					break;
+				case "server_id":
+					displayText = guildData?.id || "Unknown";
+					break;
+				case "member_count":
+					displayText =
+						guildData?.guild_details?.approximate_member_count?.toString() ||
+						"0";
+					break;
+			}
+
+			console.log(
+				"Rendering variable mention:",
+				id,
+				"with display text:",
+				displayText,
+			);
+
 			return (
 				<span
-					key={`user-${id}`}
+					key={`variable-${id}`}
 					className="text-[#5865F2] bg-[#5865F21A] rounded px-1 mention"
-					data-mention-type="user"
+					data-mention-type="variable"
 					data-mention-value={id}
+					data-value={id}
 				>
-					@{userData?.username || "user"}
+					{displayText}
 				</span>
 			);
 		}
@@ -847,18 +947,100 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 		return null;
 	};
 
+	useEffect(() => {
+		if (!embed) return;
+
+		const hasEmbedChanged = embed !== lastValueRef.current;
+		const hasUserDataChanged = userData !== lastDataRef.current.userData;
+		const hasGuildDataChanged = guildData?.id !== lastDataRef.current.guildId;
+		const hasChannelsChanged = channels !== lastDataRef.current.channels;
+		const hasRolesChanged = roles !== lastDataRef.current.roles;
+
+		// Update our tracking refs
+		lastValueRef.current = embed;
+		lastDataRef.current = {
+			embedId: embed?.title || "", // Just using title as a simple identifier
+			userData,
+			guildId: guildData?.id || "",
+			channels,
+			roles,
+		};
+
+		// Process embed values when present
+		console.log("Processing embed values, original embed:", embed);
+		console.log("Current userData:", userData, "guildData:", guildData?.name);
+		console.log("Changes detected:", {
+			hasEmbedChanged,
+			hasUserDataChanged,
+			hasGuildDataChanged,
+			hasChannelsChanged,
+			hasRolesChanged,
+		});
+
+		try {
+			// Process embed values with variables
+			console.log("Processing embed in useEffect. Original embed:", embed);
+
+			const processedData = {
+				...embed,
+				title: embed.title ? processVariables(embed.title, true) : undefined,
+				description: embed.description
+					? processVariables(embed.description)
+					: undefined,
+				fields: embed.fields
+					? embed.fields.map((field) => ({
+							name: field.name ? processVariables(field.name) : field.name,
+							value: field.value ? processVariables(field.value) : field.value,
+							inline: field.inline,
+						}))
+					: [],
+				footer: embed.footer
+					? {
+							text: processVariables(embed.footer.text),
+						}
+					: undefined,
+			};
+
+			console.log("Processed embed data:", processedData);
+
+			// Force refresh by creating a new object reference
+			setProcessedEmbed({ ...processedData });
+		} catch (error) {
+			console.error("Error processing embed:", error);
+		}
+	}, [embed, userData, guildData, channels, roles, processVariables]);
+	/* eslint-enable react-hooks/exhaustive-deps */
+
 	// Helper function to parse text with mentions and formatting
 	const parseWithGuildData = (
 		content: string,
 		asFragment = false,
 	): ReactElement[] | string => {
 		try {
-			// Check if the content already contains properly styled mentions
-			if (content.includes('contenteditable="false"')) {
+			// Always apply variable replacements for content to ensure variables are formatted
+			// This ensures that {server_name}, {user}, etc. are always replaced with their values
+			const processedContent = formatTextVariables(content);
+
+			// Define strings to check for
+			const mentionTypeStr = 'data-type="mention"';
+			const mentionAttrStr = "data-mention-type";
+			const mentionClassStr = "mention";
+			const customizeClassStr = "customize-mention";
+			const formattingTags = ["<strong>", "<em>", "<u>", "<del>", "<code>"];
+
+			// Check if the content contains HTML that needs to be processed
+			const containsHtml =
+				processedContent.indexOf(mentionTypeStr) !== -1 ||
+				processedContent.indexOf(mentionAttrStr) !== -1 ||
+				processedContent.indexOf(mentionClassStr) !== -1 ||
+				processedContent.indexOf(customizeClassStr) !== -1 ||
+				formattingTags.some((tag) => processedContent.indexOf(tag) !== -1);
+
+			if (containsHtml) {
 				// Create a temporary DOM element to parse the HTML content
 				const temp = document.createElement("div");
 				// Sanitize and set innerHTML
-				temp.innerHTML = DOMPurify.sanitize(content, {
+				temp.innerHTML = DOMPurify.sanitize(processedContent, {
 					ALLOWED_TAGS: [
 						"span",
 						"div",
@@ -869,14 +1051,22 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 						"u",
 						"strong",
 						"em",
+						"code",
+						"del",
+						"img",
 					],
 					ALLOWED_ATTR: [
 						"class",
 						"data-type",
 						"data-value",
-						"contenteditable",
 						"data-mention-type",
+						"contenteditable",
+						"src",
+						"alt",
+						"style",
 					],
+					ADD_ATTR: ["data-mention-type", "data-value"],
+					ALLOW_DATA_ATTR: true,
 				});
 
 				// Process the nodes to convert mention spans to React elements
@@ -888,38 +1078,15 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 					: elements;
 			}
 
-			// First apply variable replacements for content without mentions
-			const processedContent = formatTextVariables(content);
+			// If no HTML was found, process as plain text
+			const formattedText = formatText(processedContent);
 
-			// Create a temporary DOM element to parse the HTML content
-			const temp = document.createElement("div");
-			// Sanitize and set innerHTML
-			temp.innerHTML = DOMPurify.sanitize(processedContent, {
-				ALLOWED_TAGS: ["span", "div", "p", "br", "b", "i", "u", "strong", "em"],
-				ALLOWED_ATTR: [
-					"class",
-					"data-type",
-					"data-value",
-					"contenteditable",
-					"data-mention-type",
-				],
-			});
-
-			// Check if there are any mention spans
-			const hasMentionSpans = temp.querySelector("span.mention") !== null;
-
-			if (hasMentionSpans) {
-				// Process the nodes to convert mention spans to React elements
-				const elements = processNodes(temp);
-
-				// Return the elements as a fragment if requested
-				return asFragment && elements.length > 0
-					? [<Fragment key="mention-fragment">{elements}</Fragment>]
-					: elements;
+			// If we need a fragment and the result is a string, wrap it
+			if (asFragment && typeof formattedText === "string") {
+				return [<Fragment key="text-fragment">{formattedText}</Fragment>];
 			}
 
-			// If no mention spans were found, process as plain text
-			return processTextContent(processedContent, asFragment);
+			return formattedText;
 		} catch (error) {
 			console.error("Error parsing content with guild data:", error);
 			// Fallback to basic text rendering
@@ -931,9 +1098,12 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 	const resolveImageUrl = (url: string): string | undefined => {
 		if (!url) return undefined;
 
+		console.log("Resolving image URL:", url);
+
 		// Handle special variables
 		if (url.startsWith("{") && url.endsWith("}")) {
 			const variable = url.slice(1, -1);
+			console.log("Handling image variable:", variable);
 			switch (variable) {
 				case "server_image": {
 					if (!guildData?.guild_details?.icon) {
@@ -981,24 +1151,29 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 		return undefined;
 	};
 
+	if (!processedEmbed) return null;
+
 	// Calculate color for embed display
-	const color = processedEmbed.color
+	const color = processedEmbed?.color
 		? `#${processedEmbed.color.toString(16).padStart(6, "0")}`
 		: "#1e40af";
 
 	// Calculate grid columns based on inline fields
-	const gridCols = processedEmbed.fields?.some((field) => field.inline)
+	const gridCols = processedEmbed?.fields?.some((field) => field.inline)
 		? "grid-cols-2"
 		: "grid-cols-1";
 
 	// Get bot's avatar URL
-	const botAvatarUrl = avatarUrl(userData.id, userData.avatar, 128, true);
+	const botAvatarUrl =
+		userData?.id && userData.avatar
+			? avatarUrl(userData.id, userData.avatar, 128, true)
+			: undefined;
 
 	// Process image URLs
-	const thumbnailUrl = processedEmbed.thumbnail?.url
+	const thumbnailUrl = processedEmbed?.thumbnail?.url
 		? resolveImageUrl(processedEmbed.thumbnail.url)
 		: undefined;
-	const imageUrl = processedEmbed.image?.url
+	const imageUrl = processedEmbed?.image?.url
 		? resolveImageUrl(processedEmbed.image.url)
 		: undefined;
 
@@ -1016,7 +1191,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 							}}
 						/>
 						<AvatarFallback>
-							{userData.username.slice(0, 2).toUpperCase()}
+							{userData?.username?.slice(0, 2).toUpperCase()}
 						</AvatarFallback>
 					</Avatar>
 				</div>

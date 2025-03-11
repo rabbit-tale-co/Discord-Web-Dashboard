@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 import { getCachedData } from "@/lib/cache";
 import type { GuildData } from "@/types/guild";
 import { getUser } from "@/hooks/use-user";
-import { globalVariables } from "@/lib/variables";
+import { globalVariables, type Variable } from "@/lib/variables";
 import { VariableMention } from "./variable-mention";
 import type {
 	CustomText,
@@ -38,7 +38,6 @@ import type {
 	ParagraphElement,
 	WindowWithEditors,
 } from "./types";
-import type { Variable } from "@/components/ui/mention/mention-popover";
 
 import {
 	Popover,

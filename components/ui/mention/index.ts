@@ -29,14 +29,7 @@ export {
 
 // Export core components
 export { MentionTextarea } from "./mention-textarea";
-export { MentionPopover } from "./mention-popover";
 export { EmojiPicker } from "./emoji-picker";
-
-// Export types from textarea base
-export type {
-	MentionElement,
-	MentionType as MentionTypeEnum,
-} from "./mention-textarea";
 
 // Re-export from the formatter hook
 export { useMentionFormatter, Mention } from "@/hooks/use-mention-formatter";
