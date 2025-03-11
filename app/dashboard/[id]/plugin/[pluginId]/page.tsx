@@ -132,14 +132,6 @@ export default function PluginPage() {
 				throw new Error("Bot ID not configured in environment variables");
 			}
 
-			// Log the request details
-			// console.log("Sending request to:", endpoint);
-			// console.log("Request payload:", {
-			// 	bot_id: "[HIDDEN]",
-			// 	guild_id: guildId,
-			// 	plugin_name: pluginId,
-			// });
-
 			// Send request to the appropriate API endpoint
 			// Using parameter names that match the backend API expectations
 			const response = await fetch(endpoint, {

@@ -16,25 +16,35 @@ export async function GET(request: Request) {
 			);
 		}
 
-		const response = await fetch(`https://discord.com/api/users/${id}`, {
+		const apiUrl = `https://discord.com/api/users/${id}`;
+		console.log("Calling Discord API:", apiUrl);
+
+		const response = await fetch(apiUrl, {
 			headers: {
 				Authorization: `Bot ${process.env.BOT_TOKEN}`,
+				"Content-Type": "application/json",
 			},
 			cache: "no-store",
 		});
 
 		if (!response.ok) {
-			throw new Error(`Failed to fetch user: ${response.status}`);
+			const errorText = await response.text();
+			console.error("Discord API Error Details:", {
+				status: response.status,
+				statusText: response.statusText,
+				error: errorText,
+				headers: Object.fromEntries(response.headers.entries()),
+				url: apiUrl,
+			});
+			throw new Error(
+				`Failed to fetch user: ${response.status} - ${errorText}`,
+			);
 		}
 
-		const userData = await response.json();
+		const memberData = await response.json();
+		console.log("Full Discord member data:", memberData);
 
-		return NextResponse.json({
-			id: userData.id,
-			username: userData.username,
-			avatar: userData.avatar,
-			displayName: userData.global_name,
-		});
+		return NextResponse.json(memberData);
 	} catch (error) {
 		console.error("Error fetching user:", error);
 		return NextResponse.json(

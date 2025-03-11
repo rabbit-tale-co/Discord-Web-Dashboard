@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Users, MessageSquare, Hash, Crown } from "lucide-react";
 import avatarUrl from "@/lib/is-gif";
 import type { GuildData } from "@/hooks/use-guilds";
-import { useUser } from "@/hooks/use-user";
+import { getUser } from "@/hooks/use-user";
+import { useEffect, useState } from "react";
+import type { User } from "discord.js";
 
 interface GuildOverviewProps {
 	guildData: GuildData & {
@@ -30,13 +32,20 @@ export function ServerOverview({ guildData }: GuildOverviewProps) {
 		rolesCount,
 		created_at,
 	} = guildData;
+	const [ownerData, setOwnerData] = useState<User | null>(null);
 
 	const totalChannels =
 		category_count + text_channel_count + voice_channel_count;
 
-	const { userData: ownerData, status: ownerStatus } = useUser(
-		guild_details.owner_id,
-	);
+	useEffect(() => {
+		const fetchOwnerData = async () => {
+			console.log(`fetching owner data for ${guild_details.owner_id}`);
+			const userData = await getUser(guild_details.owner_id);
+			setOwnerData(userData);
+			console.log(`owner data fetched: ${userData?.username}`);
+		};
+		fetchOwnerData();
+	}, [guild_details.owner_id]);
 
 	return (
 		<Card className="overflow-hidden">
@@ -58,17 +67,13 @@ export function ServerOverview({ guildData }: GuildOverviewProps) {
 						</p>
 						<div className="flex items-center justify-center sm:justify-start mt-2 text-xs sm:text-sm text-muted-foreground">
 							<Crown className="w-4 h-4 mr-1" />
-							{ownerStatus === "loading"
-								? "Loading..."
-								: ownerData
-									? ownerData.username
-									: "Owner not found"}
+							{ownerData ? ownerData.username : "Owner not found"}
 						</div>
 					</div>
 					<div className="w-full sm:w-auto sm:ml-auto text-center sm:text-right uppercase text-sm">
 						{guild_details.region}
 						<div className="flex flex-wrap justify-center sm:justify-end gap-1 mt-2">
-							{guild_details.features.includes("COMMUNITY") && (
+							{(guild_details.features as string[])?.includes("COMMUNITY") && (
 								<Badge variant="outline" className="text-xs">
 									Community
 								</Badge>

@@ -16,12 +16,17 @@ const avatarUrl = (
 	isUserAvatar = true,
 ) => {
 	if (!avatar) {
-		const defaultNum = Number.parseInt(id) % 5;
-		return `https://cdn.discordapp.com/embed/avatars/${defaultNum}.png`;
+		if (isUserAvatar) {
+			const defaultNum = Number.parseInt(id) % 5;
+			return `https://cdn.discordapp.com/embed/avatars/${defaultNum}.png?size=${size}`;
+		}
+		return `https://cdn.discordapp.com/embed/avatars/0.png?size=${size}`;
 	}
 
-	const extension = isGif(avatar) ? "gif" : "webp";
-	return `https://cdn.discordapp.com/${getType(isUserAvatar)}/${id}/${avatar}.${extension}?size=${size}`;
+	const extension = isGif(avatar) ? "gif" : "png";
+	const type = getType(isUserAvatar);
+	const url = `https://cdn.discordapp.com/${type}/${id}/${avatar}.${extension}?size=${size}`;
+	return url;
 };
 
 export default avatarUrl;

@@ -31,7 +31,6 @@ export function VariableMention({
 						type: "mention",
 						mentionType: "variable",
 						value: `{${variable.id}}`,
-						displayValue: variable.name,
 						children: [{ text: "" }],
 					},
 					{ at: path },

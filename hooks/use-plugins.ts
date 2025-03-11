@@ -49,8 +49,19 @@ export type WelcomeGoodbye = {
 		color?: number;
 		title?: string;
 		description?: string;
+		fields?: Array<{
+			name: string;
+			value: string;
+			inline?: boolean;
+		}>;
 		footer?: {
 			text: string;
+		};
+		thumbnail?: {
+			url: string;
+		};
+		image?: {
+			url: string;
 		};
 	};
 	join_role_id?: string;
@@ -176,11 +187,8 @@ export type PluginTypes = {
 };
 
 // Helper function to safely extract guild ID from potentially different GuildData structures
-function getGuildId(guildData: { guild_details?: { id: string }; id?: string }):
-	| string
-	| undefined {
+function getGuildId(guildData: GuildData): string | undefined {
 	if (!guildData) return undefined;
-	// Handle both possible structures
 	return guildData.guild_details?.id || guildData.id;
 }
 

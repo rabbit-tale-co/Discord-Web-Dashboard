@@ -24,8 +24,39 @@ export interface RawChannel {
 export interface GuildData {
 	id: string;
 	name: string;
+	icon?: string;
+	guild_details?: {
+		id?: string;
+		name?: string;
+		icon?: string | null;
+		banner?: string | null;
+		description?: string | null;
+		premium_tier?: number | null;
+		premium_subscription_count?: number | null;
+		nsfw_level?: number | null;
+		explicit_content_filter?: number | null;
+		system_channel_id?: string | null;
+		owner_id?: string;
+		features?: GuildFeature[];
+		approximate_member_count?: number;
+		approximate_presence_count?: number;
+		createdAt?: string;
+	};
 	roles: RawRole[];
 	channels: RawChannel[];
+	category_count?: number;
+	text_channel_count?: number;
+	voice_channel_count?: number;
+	rolesCount?: number;
+	created_at?: string;
+	features?: string[];
+	premium_tier?: number;
+	premium_subscription_count?: number;
+	nsfw_level?: number;
+	explicit_content_filter?: number;
+	system_channel_id?: string;
+	system_channel_flags?: number;
+	region?: string;
 }
 
 // Extend window interface

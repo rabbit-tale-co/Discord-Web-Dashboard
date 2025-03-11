@@ -49,6 +49,47 @@ import { ColorPicker } from "../fields/color-picker";
 import type { User } from "discord.js";
 import { MessageField } from "../fields/message-field";
 
+// Define interfaces for our types
+interface EmbedField {
+	name: string;
+	value: string;
+	inline?: boolean;
+}
+
+interface EmbedFooter {
+	text: string;
+}
+
+interface EmbedThumbnail {
+	url: string;
+}
+
+interface EmbedImage {
+	url: string;
+}
+
+interface EmbedData {
+	color?: number;
+	title?: string;
+	description?: string;
+	fields?: EmbedField[];
+	footer?: EmbedFooter;
+	thumbnail?: EmbedThumbnail;
+	image?: EmbedImage;
+}
+
+interface FormValues {
+	enabled: boolean;
+	type: "embed" | "text";
+	welcome_message?: string;
+	welcome_channel_id?: string;
+	leave_message?: string;
+	leave_channel_id?: string;
+	join_role_id?: string;
+	embed_welcome?: EmbedData;
+	embed_leave?: EmbedData;
+}
+
 // Define the form schema
 const formSchema = z.object({
 	enabled: z.boolean().default(false),
@@ -122,8 +163,6 @@ const formSchema = z.object({
 		.optional(),
 });
 
-type FormValues = z.infer<typeof formSchema>;
-
 interface WelcomeFormProps {
 	plugin: WelcomeGoodbye;
 }
@@ -133,11 +172,33 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 	const guildId = params.id as string;
 	const [activeSection, setActiveSection] = useState("welcome-message");
 	const { guildData } = useGuild(guildId);
-	const { refetchPlugins } = usePlugins(guildData as GuildData);
+	const { refetchPlugins } = usePlugins(
+		guildData
+			? ({
+					id: guildData.id,
+					name: guildData.name,
+					icon: guildData.guild_details?.icon || undefined,
+					roles: guildData.roles || [],
+					channels: guildData.channels || [],
+					guild_details: guildData.guild_details || {},
+					category_count: 0,
+					text_channel_count: 0,
+					voice_channel_count: 0,
+					rolesCount: 0,
+					created_at: "",
+					features: [],
+					premium_tier: 0,
+					premium_subscription_count: 0,
+					nsfw_level: 0,
+					explicit_content_filter: 0,
+					system_channel_id: "",
+					system_channel_flags: 0,
+					region: "",
+				} as unknown as GuildData)
+			: ({} as GuildData),
+	);
 	const [isSaving, setIsSaving] = useState(false);
-	const [previewEmbed, setPreviewEmbed] = useState<NonNullable<
-		FormValues["embed_welcome"] | FormValues["embed_leave"]
-	> | null>(null);
+	const [previewEmbed, setPreviewEmbed] = useState<EmbedData | null>(null);
 	const [user, setUser] = useState<User | null>(null);
 
 	// Fetch user data on component mount
@@ -166,93 +227,116 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 			leave_message: plugin.leave_message,
 			leave_channel_id: plugin.leave_channel_id,
 			join_role_id: plugin.join_role_id,
-			embed_welcome: plugin.embed_welcome,
-			embed_leave: plugin.embed_leave,
+			embed_welcome: {
+				color: plugin.embed_welcome?.color,
+				title: plugin.embed_welcome?.title || "",
+				description: plugin.embed_welcome?.description || "",
+				fields:
+					plugin.embed_welcome?.fields?.map((field) => ({
+						name: field.name || "",
+						value: field.value || "",
+						inline: field.inline,
+					})) || [],
+				thumbnail: plugin.embed_welcome?.thumbnail
+					? {
+							url: plugin.embed_welcome.thumbnail.url || "",
+						}
+					: { url: "" },
+				image: plugin.embed_welcome?.image
+					? {
+							url: plugin.embed_welcome.image.url || "",
+						}
+					: { url: "" },
+				footer: plugin.embed_welcome?.footer
+					? {
+							text: plugin.embed_welcome.footer.text || "",
+						}
+					: { text: "" },
+			},
+			embed_leave: {
+				color: plugin.embed_leave?.color,
+				title: plugin.embed_leave?.title || "",
+				description: plugin.embed_leave?.description || "",
+				fields:
+					plugin.embed_leave?.fields?.map((field) => ({
+						name: field.name || "",
+						value: field.value || "",
+						inline: field.inline,
+					})) || [],
+				thumbnail: plugin.embed_leave?.thumbnail
+					? {
+							url: plugin.embed_leave.thumbnail.url || "",
+						}
+					: { url: "" },
+				image: plugin.embed_leave?.image
+					? {
+							url: plugin.embed_leave.image.url || "",
+						}
+					: { url: "" },
+				footer: plugin.embed_leave?.footer
+					? {
+							text: plugin.embed_leave.footer.text || "",
+						}
+					: { text: "" },
+			},
 		},
 	});
 
 	// Watch all form values for changes
-	const formValues = useWatch({
+	const formValues = useWatch<FormValues>({
 		control: form.control,
 	});
-
-	// Add helper function to replace variables with useCallback
-	const replaceVariables = useCallback(
-		(text?: string) => {
-			if (!text) return "";
-			// console.log("replaceVariables user:", user);
-			return text
-				.replace(/{username}/g, user?.username || "Bot")
-				.replace(/{user}/g, `<@${user?.id}>` || "@User")
-				.replace(/{server}/g, guildData?.name || "Server")
-				.replace(/{server_name}/g, guildData?.name || "Server")
-				.replace(/{server_image}/g, guildData?.guild_details?.icon || "")
-				.replace(
-					/{avatar}/g,
-					user?.avatar || "https://cdn.discordapp.com/embed/avatars/0.png",
-				)
-				.replace(
-					/{user_avatar}/g,
-					user?.avatar || "https://cdn.discordapp.com/embed/avatars/0.png",
-				)
-				.replace(
-					/{server_avatar}/g,
-					guildData?.guild_details?.icon ||
-						"https://cdn.discordapp.com/embed/avatars/1.png",
-				);
-		},
-		[user, guildData],
-	);
 
 	// Update preview when any form field changes
 	useEffect(() => {
 		if (formValues.type === "embed") {
 			const section = activeSection;
-			const embedData =
+			const rawEmbedData =
 				section === "welcome-embed"
 					? formValues.embed_welcome
 					: formValues.embed_leave;
 
-			if (embedData) {
-				// Replace variables in preview but keep HTML structure intact
-				const previewData = {
-					...embedData,
-					title: replaceVariables(embedData.title),
-					description: replaceVariables(embedData.description),
-					fields: embedData.fields?.map((field) => ({
-						...field,
-						name: replaceVariables(field.name),
-						value: replaceVariables(field.value),
-					})),
-					footer: embedData.footer
-						? {
-								...embedData.footer,
-								text: replaceVariables(embedData.footer.text),
-							}
-						: undefined,
-					thumbnail: embedData.thumbnail
-						? {
-								...embedData.thumbnail,
-								url: replaceVariables(embedData.thumbnail.url),
-							}
-						: undefined,
-					image: embedData.image
-						? {
-								...embedData.image,
-								url: replaceVariables(embedData.image.url),
-							}
-						: undefined,
-				};
+			// Ensure fields have required properties
+			const validatedFields =
+				rawEmbedData?.fields?.map((field) => ({
+					name: field.name || "",
+					value: field.value || "",
+					inline: field.inline,
+				})) || [];
 
-				// Debug log to check the preview data
-				// console.log("Setting preview embed data:", previewData);
+			// Ensure footer, thumbnail and image have required properties
+			const validatedFooter = rawEmbedData?.footer
+				? {
+						text: rawEmbedData.footer.text || "",
+					}
+				: undefined;
 
-				setPreviewEmbed(previewData);
-			} else {
-				setPreviewEmbed(null);
-			}
+			const validatedThumbnail = rawEmbedData?.thumbnail
+				? {
+						url: rawEmbedData.thumbnail.url || "",
+					}
+				: undefined;
+
+			const validatedImage = rawEmbedData?.image
+				? {
+						url: rawEmbedData.image.url || "",
+					}
+				: undefined;
+
+			// Create validated embed data
+			const previewEmbed: EmbedData = {
+				color: rawEmbedData?.color,
+				title: rawEmbedData?.title || "",
+				description: rawEmbedData?.description || "",
+				fields: validatedFields,
+				footer: validatedFooter || { text: "" },
+				thumbnail: validatedThumbnail || { url: "" },
+				image: validatedImage || { url: "" },
+			};
+
+			setPreviewEmbed(previewEmbed);
 		}
-	}, [formValues, activeSection, replaceVariables]);
+	}, [formValues, activeSection]);
 
 	// Update form values when plugin data changes
 	useEffect(() => {
@@ -265,8 +349,24 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 				leave_message: plugin.leave_message,
 				leave_channel_id: plugin.leave_channel_id,
 				join_role_id: plugin.join_role_id,
-				embed_welcome: plugin.embed_welcome,
-				embed_leave: plugin.embed_leave,
+				embed_welcome: {
+					color: plugin.embed_welcome?.color,
+					title: plugin.embed_welcome?.title || "",
+					description: plugin.embed_welcome?.description || "",
+					fields: plugin.embed_welcome?.fields || [],
+					thumbnail: plugin.embed_welcome?.thumbnail || { url: "" },
+					image: plugin.embed_welcome?.image || { url: "" },
+					footer: plugin.embed_welcome?.footer || { text: "" },
+				},
+				embed_leave: {
+					color: plugin.embed_leave?.color,
+					title: plugin.embed_leave?.title || "",
+					description: plugin.embed_leave?.description || "",
+					fields: plugin.embed_leave?.fields || [],
+					thumbnail: plugin.embed_leave?.thumbnail || { url: "" },
+					image: plugin.embed_leave?.image || { url: "" },
+					footer: plugin.embed_leave?.footer || { text: "" },
+				},
 			};
 			form.reset(values);
 		}
@@ -299,12 +399,6 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 			windowWithVars.__variableCategories = categories;
 		}
 	}, [guildData, variables, categories]);
-
-	// Add console logs for debugging
-	// console.log("Variables:", variables);
-	// console.log("Categories:", categories);
-	// console.log("Roles:", guildData?.roles);
-	// console.log("Channels:", guildData?.channels);
 
 	// Handle form submission
 	const handleSubmit = async (values: FormValues) => {
@@ -429,7 +523,11 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 						<TabsTrigger value="roles">Roles</TabsTrigger>
 					</TabsList>
 
-					<TabsContent value="welcome-message" className="space-y-4">
+					<TabsContent
+						key="welcome-message-tab"
+						value="welcome-message"
+						className="space-y-4"
+					>
 						<MessageField
 							name="welcome_message"
 							label="Welcome Message"
@@ -437,10 +535,15 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 							showEmojiPicker={false}
 							rows={3}
 							maxLength={1000}
+							id="welcome-message-field"
 						/>
 					</TabsContent>
 
-					<TabsContent value="leave-message" className="space-y-4">
+					<TabsContent
+						key="leave-message-tab"
+						value="leave-message"
+						className="space-y-4"
+					>
 						<MessageField
 							name="leave_message"
 							label="Leave Message"
@@ -448,10 +551,15 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 							showEmojiPicker={false}
 							rows={3}
 							maxLength={1000}
+							id="leave-message-field"
 						/>
 					</TabsContent>
 
-					<TabsContent value="welcome-embed" className="space-y-4">
+					<TabsContent
+						key="welcome-embed-tab"
+						value="welcome-embed"
+						className="space-y-4"
+					>
 						<div className="grid grid-cols-2 gap-6">
 							<div className="space-y-4">
 								<FormField
@@ -481,6 +589,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 									showEmojiPicker={false}
 									rows={1}
 									maxLength={100}
+									id="welcome-embed-title-field"
 								/>
 
 								<MessageField
@@ -490,12 +599,32 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 									showEmojiPicker={false}
 									rows={4}
 									maxLength={500}
+									id="welcome-embed-description-field"
 								/>
 
-								<EmbedFieldsEditor
-									name="embed_welcome.fields"
-									label="Fields"
-									description="Add fields to your welcome embed"
+								<FormField
+									control={form.control}
+									name="embed_welcome.thumbnail.url"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Thumbnail URL</FormLabel>
+											<FormDescription>
+												Enter the URL for the thumbnail image
+											</FormDescription>
+											<FormControl>
+												<MentionTextarea
+													value={field.value || ""}
+													onChange={field.onChange}
+													variables={variables}
+													categories={categories}
+													placeholder="Enter URL or use {server_image}, {bot_avatar}"
+													singleLine
+													id="welcome-embed-thumbnail-field"
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
 								/>
 
 								<MessageField
@@ -505,19 +634,52 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 									showEmojiPicker={false}
 									singleLine
 									maxLength={100}
+									id="welcome-embed-footer-field"
+								/>
+
+								<EmbedFieldsEditor
+									name="embed_welcome.fields"
+									label="Fields"
+									description="Add fields to your welcome embed"
+									id="welcome-embed-fields"
 								/>
 							</div>
 
 							<div className="sticky top-4">
 								<EmbedPreview
 									embed={formValues.type === "embed" ? previewEmbed : null}
-									guildData={guildData as GuildData}
+									guildData={
+										{
+											id: guildData?.id || "",
+											name: guildData?.name || "",
+											icon: guildData?.guild_details?.icon || undefined,
+											roles: guildData?.roles || [],
+											channels: guildData?.channels || [],
+											guild_details: guildData?.guild_details || {},
+											category_count: 0,
+											text_channel_count: 0,
+											voice_channel_count: 0,
+											rolesCount: 0,
+											created_at: "",
+											features: [],
+											premium_tier: 0,
+											premium_subscription_count: 0,
+											nsfw_level: 0,
+											explicit_content_filter: 0,
+											system_channel_id: "",
+											system_channel_flags: 0,
+										} as unknown as GuildData
+									}
 								/>
 							</div>
 						</div>
 					</TabsContent>
 
-					<TabsContent value="leave-embed" className="space-y-4">
+					<TabsContent
+						key="leave-embed-tab"
+						value="leave-embed"
+						className="space-y-4"
+					>
 						<div className="grid grid-cols-2 gap-6">
 							<div className="space-y-4">
 								<FormField
@@ -558,11 +720,8 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 													placeholder="Goodbye from {server}!"
 													maxLength={100}
 													rows={1}
-													roles={guildData?.roles || []}
-													channels={guildData?.channels || []}
 													singleLine={false}
-													showEmojiPicker={true}
-													showSuggestions={true}
+													id="leave-embed-title-field"
 												/>
 											</FormControl>
 											<FormMessage />
@@ -585,14 +744,10 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 													onChange={field.onChange}
 													variables={variables}
 													categories={categories}
-													placeholder="{user} has left the server."
+													placeholder="We're sad to see you go!"
 													maxLength={500}
 													rows={4}
-													roles={guildData?.roles || []}
-													channels={guildData?.channels || []}
-													singleLine={false}
-													showEmojiPicker={true}
-													showSuggestions={true}
+													id="leave-embed-description-field"
 												/>
 											</FormControl>
 											<FormMessage />
@@ -602,55 +757,125 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 
 								<FormField
 									control={form.control}
-									name="embed_leave.fields"
-									render={() => (
-										<EmbedFieldsEditor
-											name="embed_leave.fields"
-											label="Fields"
-											description="Add fields to your leave embed"
-										/>
+									name="embed_leave.thumbnail.url"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Thumbnail URL</FormLabel>
+											<FormDescription>
+												Enter the URL for the thumbnail image
+											</FormDescription>
+											<FormControl>
+												<MentionTextarea
+													value={field.value || ""}
+													onChange={field.onChange}
+													variables={variables}
+													categories={categories}
+													placeholder="Enter URL or use {server_image}, {bot_avatar}"
+													singleLine
+													id="leave-embed-thumbnail-field"
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
 									)}
 								/>
 
-								<MessageField
+								<FormField
+									control={form.control}
 									name="embed_leave.footer.text"
-									label="Footer"
-									description="Text that appears at the bottom of the leave embed"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Footer</FormLabel>
+											<FormDescription>
+												Text that appears at the bottom of the leave embed
+											</FormDescription>
+											<FormControl>
+												<MentionTextarea
+													value={field.value || ""}
+													onChange={field.onChange}
+													variables={variables}
+													categories={categories}
+													placeholder="Come back soon!"
+													maxLength={100}
+													singleLine
+													id="leave-embed-footer-field"
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+
+								<EmbedFieldsEditor
+									name="embed_leave.fields"
+									label="Fields"
+									description="Add fields to your leave embed"
+									id="leave-embed-fields"
 								/>
 							</div>
 
 							<div className="sticky top-4">
 								<EmbedPreview
 									embed={formValues.type === "embed" ? previewEmbed : null}
-									guildData={guildData as GuildData}
+									guildData={
+										{
+											id: guildData?.id || "",
+											name: guildData?.name || "",
+											icon: guildData?.guild_details?.icon || undefined,
+											roles: guildData?.roles || [],
+											channels: guildData?.channels || [],
+											guild_details: guildData?.guild_details || {},
+											category_count: 0,
+											text_channel_count: 0,
+											voice_channel_count: 0,
+											rolesCount: 0,
+											created_at: "",
+											features: [],
+											premium_tier: 0,
+											premium_subscription_count: 0,
+											nsfw_level: 0,
+											explicit_content_filter: 0,
+											system_channel_id: "",
+											system_channel_flags: 0,
+											region: "",
+										} as unknown as GuildData
+									}
 								/>
 							</div>
 						</div>
 					</TabsContent>
 
-					<TabsContent value="channels" className="space-y-4">
-						<ChannelField
-							name="welcome_channel_id"
-							label="Welcome Channel"
-							description="Channel where welcome messages will be sent"
-							guildId={guildId}
-						/>
+					<TabsContent
+						key="channels-tab"
+						value="channels"
+						className="space-y-4"
+					>
+						<div className="grid grid-cols-2 gap-6">
+							<ChannelField
+								name="welcome_channel_id"
+								label="Welcome Channel"
+								description="Channel where welcome messages will be sent"
+								guildId={guildId}
+							/>
 
-						<ChannelField
-							name="leave_channel_id"
-							label="Leave Channel"
-							description="Channel where leave messages will be sent"
-							guildId={guildId}
-						/>
+							<ChannelField
+								name="leave_channel_id"
+								label="Leave Channel"
+								description="Channel where leave messages will be sent"
+								guildId={guildId}
+							/>
+						</div>
 					</TabsContent>
 
-					<TabsContent value="roles" className="space-y-4">
-						<RoleField
-							name="join_role_id"
-							label="Join Role"
-							description="Role that will be added to users when they join"
-							guildId={guildId}
-						/>
+					<TabsContent key="roles-tab" value="roles" className="space-y-4">
+						<div className="grid grid-cols-2 gap-6">
+							<RoleField
+								name="join_role_id"
+								label="Join Role"
+								description="Role that will be added to users when they join"
+								guildId={guildId}
+							/>
+						</div>
 					</TabsContent>
 				</Tabs>
 

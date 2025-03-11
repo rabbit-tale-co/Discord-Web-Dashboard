@@ -76,7 +76,8 @@ export async function getMe(): Promise<Discord.User | null> {
 
 async function getUserFromAPI(userId: string): Promise<Discord.User | null> {
 	try {
-		const res = await fetch(`/api/users/${userId}`);
+		const url = `/api/users/${userId}`;
+		const res = await fetch(url);
 		if (!res.ok) {
 			console.error("Error fetching user:", res.statusText);
 			return null;
@@ -99,7 +100,12 @@ export async function getUser(userId: string): Promise<Discord.User | null> {
 			return cached.data;
 		}
 
-		getUserFromAPI(userId);
+		// If cache is expired, fetch new data but don't wait for it
+		getUserFromAPI(userId).then((data) => {
+			if (data) {
+				setCachedData(`user-${userId}`, data, CACHE_TIME);
+			}
+		});
 		return cached.data;
 	}
 	return await getUserFromAPI(userId);
@@ -196,44 +202,4 @@ export function useMe() {
 		logout: logoutFn,
 		login: loginFn,
 	};
-}
-
-export function useUser(userId: string) {
-	const [userData, setUserData] = useState<Discord.User | null>(() => {
-		const cached = getCachedData<Discord.User>(`user-${userId}`);
-		return cached?.data || null;
-	});
-	const [status, setStatus] = useState<"loading" | "error" | "success">(() =>
-		getCachedData(`user-${userId}`) ? "success" : "loading",
-	);
-	const [error, setError] = useState<string | null>(null);
-
-	const router = useRouter();
-	const pathname = usePathname();
-	const protectedPaths = ["/dashboard", "/servers"];
-	const isProtectedPath = protectedPaths.some((path) =>
-		pathname.startsWith(path),
-	);
-
-	useEffect(() => {
-		if (!userId) {
-			setStatus("success");
-			return;
-		}
-
-		const cached = getCachedData<Discord.User>(`user-${userId}`);
-		if (!cached?.data?.id || Date.now() > cached.expiresAt) {
-			getUser(userId)
-				.then((data) => {
-					setUserData(data);
-					setStatus("success");
-				})
-				.catch((err: Error) => {
-					setError(err.message);
-					setStatus("error");
-				});
-		}
-	}, [userId]);
-
-	return { userData, status, error };
 }

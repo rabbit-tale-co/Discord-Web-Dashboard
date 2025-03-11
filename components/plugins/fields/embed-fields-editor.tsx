@@ -1,8 +1,8 @@
 import { useFormContext } from "react-hook-form";
-import { TrashIcon } from "lucide-react";
+import { TrashIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { useId, useEffect, useState, useCallback } from "react";
+import { useId, useEffect, useState, useCallback, useRef } from "react";
 import { FormField } from "@/components/ui/form";
 import { ArrayField } from "./array-field";
 import type { GuildData } from "@/types/guild";
@@ -88,6 +88,7 @@ interface EmbedFieldsEditorProps {
 	name: string;
 	label: string;
 	description?: string;
+	id?: string;
 }
 
 /**
@@ -97,103 +98,161 @@ export function EmbedFieldsEditor({
 	name,
 	label,
 	description,
+	id = "embed-fields-editor",
 }: EmbedFieldsEditorProps) {
-	const { control, getValues, setValue } = useFormContext();
-	const [variables, setVariables] = useState<Variable[]>([]);
-	const [categories, setCategories] = useState<Category[]>([]);
+	const { control, getValues, setValue, register } = useFormContext();
+	const [fields, setFields] = useState<EmbedField[]>([]);
 
-	// Render each embed field
-	const renderEmbedField = (index: number, remove: (index: number) => void) => (
-		<FormField
-			key={`${name}.${index}`}
-			control={control}
-			name={`${name}.${index}`}
-			render={({ field }) => {
-				const embedField = field.value as EmbedField;
-				return (
-					<FormItem className="space-y-2">
+	// Ref do przechowywania ostatnich wartości pól
+	const lastFieldsRef = useRef<EmbedField[]>([]);
+
+	// Pobierz aktualne wartości pól
+	useEffect(() => {
+		const currentFields = getValues(name) || [];
+		setFields(currentFields);
+
+		// Jeśli mamy wartości, zaktualizuj lastFieldsRef
+		if (currentFields && currentFields.length > 0) {
+			lastFieldsRef.current = [...currentFields];
+		}
+	}, [getValues, name]);
+
+	// Funkcja do aktualizacji pola
+	const updateField = useCallback(
+		(index: number, fieldName: keyof EmbedField, value: string | boolean) => {
+			const updatedFields = [...fields];
+			if (updatedFields[index]) {
+				updatedFields[index] = {
+					...updatedFields[index],
+					[fieldName]: value,
+				};
+				setValue(name, updatedFields, { shouldValidate: true });
+				setFields(updatedFields);
+
+				// Aktualizuj lastFieldsRef
+				lastFieldsRef.current = [...updatedFields];
+			}
+		},
+		[fields, name, setValue],
+	);
+
+	// Funkcja do dodawania nowego pola
+	const addField = useCallback(() => {
+		const newField: EmbedField = {
+			name: "",
+			value: "",
+			inline: false,
+			_id: generateId(),
+		};
+		const updatedFields = [...fields, newField];
+		setValue(name, updatedFields, { shouldValidate: true });
+		setFields(updatedFields);
+
+		// Aktualizuj lastFieldsRef
+		lastFieldsRef.current = [...updatedFields];
+	}, [fields, name, setValue]);
+
+	// Funkcja do usuwania pola
+	const removeField = useCallback(
+		(index: number) => {
+			const updatedFields = [...fields];
+			updatedFields.splice(index, 1);
+			setValue(name, updatedFields, { shouldValidate: true });
+			setFields(updatedFields);
+
+			// Aktualizuj lastFieldsRef
+			lastFieldsRef.current = [...updatedFields];
+		},
+		[fields, name, setValue],
+	);
+
+	// Jeśli nie mamy pól, ale mamy zapisane w lastFieldsRef, użyj ich
+	useEffect(() => {
+		if (fields.length === 0 && lastFieldsRef.current.length > 0) {
+			setFields([...lastFieldsRef.current]);
+			setValue(name, [...lastFieldsRef.current], { shouldValidate: true });
+		}
+	}, [fields.length, name, setValue]);
+
+	return (
+		<div className="space-y-4">
+			<div>
+				<FormLabel>{label}</FormLabel>
+				{description && <FormDescription>{description}</FormDescription>}
+			</div>
+
+			<div className="space-y-4">
+				{fields.map((field, index) => (
+					<div
+						key={field._id || index}
+						className="border rounded-md p-4 space-y-3"
+					>
 						<div className="flex items-center justify-between">
 							<FormLabel>{`Field ${index + 1}`}</FormLabel>
 							<Button
 								type="button"
 								variant="ghost"
 								className="h-8 px-2"
-								onClick={() => remove(index)}
+								onClick={() => removeField(index)}
 							>
 								<TrashIcon className="h-4 w-4" />
 							</Button>
 						</div>
-						<FormControl>
-							<div className="space-y-2">
-								{/* Field Name */}
-								<FormItem>
-									<FormControl>
-										<MentionTextarea
-											value={embedField.name}
-											placeholder="Field name"
-											singleLine
-											showEmojiPicker={false}
-											maxLength={100}
-											variables={variables}
-											categories={categories}
-										/>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
 
-								{/* Field Value */}
-								<FormItem>
-									<FormControl>
-										<MentionTextarea
-											value={embedField.value}
-											placeholder="Field value"
-											rows={3}
-											showEmojiPicker={false}
-											maxLength={1024}
-											variables={variables}
-											categories={categories}
-										/>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
+						{/* Field Name */}
+						<div className="space-y-2">
+							<MessageField
+								name={`${name}.${index}.name`}
+								placeholder={`Field ${index + 1} name`}
+								singleLine={true}
+								showEmojiPicker={false}
+								maxLength={100}
+								id={`${id}-field-${index}-name`}
+							/>
+						</div>
 
-								{/* Inline Toggle */}
-								<div className="flex items-center space-x-2">
-									<Switch id={`inline-${index}`} checked={embedField.inline} />
-									<label
-										htmlFor={`inline-${index}`}
-										className="text-sm font-medium leading-none cursor-pointer"
-									>
-										Inline field
-									</label>
-								</div>
-							</div>
-						</FormControl>
-					</FormItem>
-				);
-			}}
-		/>
-	);
+						{/* Field Value */}
+						<div className="space-y-2">
+							<MessageField
+								name={`${name}.${index}.value`}
+								placeholder="Field value"
+								rows={3}
+								showEmojiPicker={false}
+								maxLength={1024}
+								id={`${id}-field-${index}-value`}
+							/>
+						</div>
 
-	return (
-		<div className="space-y-4">
-			<div className="space-y-1">
-				{label && <FormLabel>{label}</FormLabel>}
-				{description && <FormDescription>{description}</FormDescription>}
+						{/* Inline Toggle */}
+						<div className="flex items-center space-x-2">
+							<Switch
+								id={`${id}-inline-${index}`}
+								checked={field.inline}
+								onCheckedChange={(checked) =>
+									updateField(index, "inline", checked)
+								}
+							/>
+							<label
+								htmlFor={`${id}-inline-${index}`}
+								className="text-sm font-medium leading-none cursor-pointer"
+							>
+								Inline field
+							</label>
+						</div>
+					</div>
+				))}
+
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					className="mt-2"
+					onClick={addField}
+				>
+					<PlusIcon className="mr-2 h-4 w-4" />
+					Add Field
+				</Button>
 			</div>
-
-			<ArrayField
-				name={name}
-				label="Add Field"
-				description=""
-				renderItem={renderEmbedField}
-				defaultValue={{
-					name: "",
-					value: "",
-					inline: false,
-					_id: generateId(),
-				}}
-			/>
 		</div>
 	);
 }

@@ -33,6 +33,7 @@ interface GuildDetails {
 	premium_tier?: number;
 	premium_subscription_count?: number;
 	createdAt: string;
+	region: string;
 }
 
 export interface GuildData {
@@ -56,6 +57,13 @@ export interface GuildData {
 	rolesCount: number;
 	created_at: string;
 	channels: Channel[];
+	features: string[];
+	premium_tier: number;
+	premium_subscription_count: number;
+	nsfw_level: number;
+	explicit_content_filter: number;
+	system_channel_id: string;
+	system_channel_flags: number;
 }
 
 export interface Channel {
@@ -149,7 +157,7 @@ export function useGuild(id: string) {
 						region: data.region,
 						created_at: data.created_at,
 					};
-					setGuildData(transformedData);
+					setGuildData(transformedData as GuildData);
 					setStatus("success");
 					setCachedData(`guild-${id}`, transformedData, "15m");
 				})

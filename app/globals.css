@@ -235,3 +235,24 @@
     rgba(0, 0, 0, 1) 100%
   );
 }
+
+/* Mention styles */
+.mentions .mention {
+  @apply rounded-sm px-1 py-0.5 font-medium bg-discord-bg/15 text-discord-bg;
+}
+
+.mentions .mention.channel {
+  @apply bg-discord-bg/15 text-discord-bg;
+}
+
+.mentions .mention.role {
+  @apply bg-discord-bg/15 text-discord-bg;
+}
+
+.mentions .mention.user {
+  @apply bg-discord-bg/15 text-discord-bg;
+}
+
+.mentions .variable {
+  @apply rounded-sm px-1 py-0.5 font-medium bg-discord-bg/15 text-discord-bg;
+}

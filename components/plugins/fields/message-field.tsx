@@ -32,6 +32,11 @@ const defaultCategories: Category[] = [
 	{ id: "mention", name: "Mentions", icon: "💬" },
 ];
 
+// Rozszerzamy FormFieldProps o opcjonalny identyfikator
+interface MessageFieldProps extends FormFieldProps {
+	id?: string; // Unikalny identyfikator dla MentionTextarea
+}
+
 export function MessageField({
 	name,
 	label,
@@ -41,8 +46,28 @@ export function MessageField({
 	placeholder,
 	rows = 3,
 	maxLength,
-}: FormFieldProps) {
+	id, // Dodajemy id jako prop
+}: MessageFieldProps) {
 	const form = useFormContext();
+
+	// Generujemy unikalny identyfikator, jeśli nie został przekazany
+	const uniqueId = useMemo(
+		() => id || `mention-textarea-${name.replace(/\./g, "-")}`,
+		[id, name],
+	);
+
+	// Ref do przechowywania ostatniej wartości pola
+	const lastValueRef = useRef<string | undefined>();
+
+	// Pobierz aktualną wartość pola
+	const fieldValue = form.watch(name);
+
+	// Aktualizuj lastValueRef, gdy zmienia się wartość pola
+	useEffect(() => {
+		if (fieldValue) {
+			lastValueRef.current = fieldValue;
+		}
+	}, [fieldValue]);
 
 	// Get or create variables and categories
 	const variables = defaultVariables;
@@ -52,29 +77,40 @@ export function MessageField({
 		<FormField
 			control={form.control}
 			name={name}
-			render={({ field }) => (
-				<FormItem>
-					{label && <FormLabel>{label}</FormLabel>}
-					<FormControl>
-						<div className="relative">
-							<MentionTextarea
-								value={field.value || ""}
-								onChange={field.onChange}
-								placeholder={placeholder || "Enter your message..."}
-								maxLength={maxLength}
-								rows={rows}
-								singleLine={singleLine}
-								showEmojiPicker={showEmojiPicker}
-								showSuggestions={true}
-								variables={variables}
-								categories={categories}
-							/>
-						</div>
-					</FormControl>
-					{description && <FormDescription>{description}</FormDescription>}
-					<FormMessage />
-				</FormItem>
-			)}
+			render={({ field }) => {
+				// Użyj ostatniej wartości, jeśli aktualna jest pusta (pomaga podczas przełączania zakładek)
+				const valueToUse = field.value || lastValueRef.current || "";
+
+				return (
+					<FormItem>
+						{label && <FormLabel>{label}</FormLabel>}
+						<FormControl>
+							<div className="relative">
+								<MentionTextarea
+									value={valueToUse}
+									onChange={(value) => {
+										// Aktualizuj lastValueRef
+										lastValueRef.current = value;
+										// Wywołaj oryginalny onChange
+										field.onChange(value);
+									}}
+									placeholder={placeholder || "Enter your message..."}
+									maxLength={maxLength}
+									rows={rows}
+									singleLine={singleLine}
+									showEmojiPicker={showEmojiPicker}
+									showSuggestions={true}
+									variables={variables}
+									categories={categories}
+									id={uniqueId}
+								/>
+							</div>
+						</FormControl>
+						{description && <FormDescription>{description}</FormDescription>}
+						<FormMessage />
+					</FormItem>
+				);
+			}}
 		/>
 	);
 }

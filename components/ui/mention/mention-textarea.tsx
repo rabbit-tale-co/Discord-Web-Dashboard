@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import type React from "react";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { Descendant } from "slate";
 import {
@@ -17,7 +17,7 @@ import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getCachedData } from "@/lib/cache";
 import type { GuildData } from "@/types/guild";
-import { useUser } from "@/hooks/use-user";
+import { getUser } from "@/hooks/use-user";
 import { globalVariables } from "@/lib/variables";
 import { VariableMention } from "./variable-mention";
 import type {
@@ -41,6 +41,14 @@ import {
 	CommandItem,
 } from "@/components/ui/command";
 
+import type * as Discord from "discord.js";
+
+export interface Category {
+	id: string;
+	name: string;
+	icon?: string;
+}
+
 // The props for your final MentionTextarea
 export interface MentionTextareaProps {
 	value?: string; // The editor content as HTML
@@ -51,7 +59,11 @@ export interface MentionTextareaProps {
 	maxLength?: number;
 	singleLine?: boolean;
 	showEmojiPicker?: boolean;
+	showSuggestions?: boolean;
 	rows?: number;
+	variables?: Variable[];
+	categories?: Category[];
+	id?: string; // Unikalny identyfikator dla edytora
 	// Optionally handle external mention popover triggers
 	onMentionStart?: (data: {
 		type: MentionType;
@@ -71,6 +83,23 @@ const EMPTY_VALUE: ParagraphElement[] = [
 	{ type: "paragraph", children: [{ text: "" }] },
 ];
 
+// Define an extended type for our editor to avoid 'any'
+interface ExtendedEditor extends ReactEditor {
+	__initialized?: boolean;
+	__lastReset?: number;
+}
+
+// Add this near the top of the file outside of components to create a proper editor instance cache
+// This prevents creating multiple instances of the same editor
+const editorInstanceCache: Record<string, ExtendedEditor> = {};
+
+// Add a processing token system to prevent repeated processing
+const processedContentTokens = new Set<string>();
+
+// Add a reset cooldown tracker to prevent rapid resets
+const lastResetTimestamps: Record<string, number> = {};
+const RESET_COOLDOWN_MS = 2000; // 2 seconds cooldown between resets
+
 // The main component
 export function MentionTextarea({
 	value = "",
@@ -86,22 +115,325 @@ export function MentionTextarea({
 	onFocus,
 	onBlur,
 	showEmojiPicker = false,
+	id = "mention-textarea", // Domyślny identyfikator
 }: MentionTextareaProps) {
 	// Get guildId from URL params
 	const params = useParams();
-	console.log("URL Params:", params);
 	const guildId = params.id as string;
-	console.log("Extracted guildId:", guildId);
 
 	// Add ref for the editor container
 	const editorRef = useRef<HTMLDivElement>(null);
 
+	// Add ref to track if component is mounted
+	const isMounted = useRef(true);
+
 	// Roles and channels from localStorage
 	const [roles, setRoles] = useState<Array<{ id: string; name: string }>>([]);
 	const [channels, setChannels] = useState<Array<Channel>>([]);
+	const [botData, setBotData] = useState<Discord.User | null>(null);
 
-	// Get bot data using useUser hook
-	const { userData: botData } = useUser(process.env.NEXT_PUBLIC_BOT_ID || "");
+	// Track if the editor is currently being edited
+	const [isEditing, setIsEditing] = useState(false);
+
+	// Store the last value to prevent loss during tab switching
+	const lastValueRef = useRef(value);
+
+	// Track the initial mount to avoid unnecessary resets
+	const initialMountRef = useRef(true);
+
+	useEffect(() => {
+		// Set mounted flag
+		isMounted.current = true;
+		initialMountRef.current = true;
+
+		// Cleanup function
+		return () => {
+			isMounted.current = false;
+			// Don't remove the editor instance from cache - we want to preserve it
+			// However, we should mark it as potentially stale
+			if (editorInstanceCache[id]) {
+				console.log(
+					`Editor ${id} component unmounted, instance preserved in cache`,
+				);
+			}
+		};
+	}, [id]);
+
+	/** Create or reuse the Slate editor instance for this id. */
+	const editor = useMemo(() => {
+		// Check if we already have an editor instance for this id
+		if (editorInstanceCache[id]) {
+			console.log(`Reusing existing editor instance for id: ${id}`);
+			return editorInstanceCache[id];
+		}
+
+		// Otherwise create a new one
+		console.log(`Creating new editor instance for id: ${id}`);
+		const newEditor = withHistory(withReact(createEditor())) as ExtendedEditor;
+
+		// Extend `isVoid` and `isInline` for mention elements
+		const { isVoid, isInline } = newEditor;
+		newEditor.isVoid = (element) => {
+			return element.type === "mention" ||
+				element.type === "mention-placeholder"
+				? true
+				: isVoid(element);
+		};
+		newEditor.isInline = (element) => {
+			return element.type === "mention" ||
+				element.type === "mention-placeholder"
+				? true
+				: isInline(element);
+		};
+
+		// Store in our cache
+		editorInstanceCache[id] = newEditor;
+		return newEditor;
+	}, [id]); // Only recreate if id changes
+
+	// Improve the initialization process to make it more reliable
+	useEffect(() => {
+		// When the component mounts, initialize it with the stored value
+		if (isMounted.current && editor) {
+			// Ensure we start with a clean slate
+			try {
+				// If it's a fresh editor (newly created), set its content from props
+				const currentEditor = editorInstanceCache[id];
+				if (currentEditor && !currentEditor.__initialized) {
+					console.log(`Initializing editor ${id} for the first time`);
+
+					// Use the provided value or lastValueRef if available
+					const contentToUse = value || lastValueRef.current || "";
+
+					// Parse the content into Slate nodes
+					const initialContent = deserializeHtml(contentToUse, singleLine);
+
+					// Set the editor content
+					editor.children = initialContent as unknown as Descendant[];
+					editor.onChange();
+
+					// Mark this editor as initialized
+					currentEditor.__initialized = true;
+
+					// If it's a new editor and we're setting its initial content,
+					// don't trigger onChange to avoid circular updates
+					lastValueRef.current = contentToUse;
+				}
+			} catch (error) {
+				console.error(`Error initializing editor ${id}:`, error);
+			}
+		}
+	}, [editor, id, value, singleLine]);
+
+	// Add special handling for tab focus to ensure the editor maintains focus
+	useEffect(() => {
+		const handleFocusLoss = () => {
+			// When the window loses focus, make sure we save the current state
+			if (editor?.children && isEditing) {
+				try {
+					const currentValue = serializeToHtml(
+						editor.children as Descendant[],
+						{
+							roles,
+							channels,
+							botId: botData?.id,
+							botName: botData?.username,
+						},
+						singleLine,
+					);
+
+					if (currentValue) {
+						console.log(`Saving content on window blur for ${id}`);
+						lastValueRef.current = currentValue;
+					}
+				} catch (err) {
+					console.error(
+						`Error saving editor state on window blur for ${id}:`,
+						err,
+					);
+				}
+			}
+		};
+
+		window.addEventListener("blur", handleFocusLoss);
+
+		return () => {
+			window.removeEventListener("blur", handleFocusLoss);
+		};
+	}, [editor, id, isEditing, roles, channels, botData, singleLine]);
+
+	// Make sure this effect only runs after the editor is initialized
+	useEffect(() => {
+		// If a new value is provided via props and it's different from what we have,
+		// AND not during initialization, update the editor
+		if (!editor) return;
+
+		// If a new value is provided via props and it's different from what we have,
+		// AND not during initialization, update the editor
+		const currentEditor = editorInstanceCache[id];
+		if (
+			value &&
+			value !== lastValueRef.current &&
+			!initialMountRef.current &&
+			currentEditor &&
+			currentEditor.__initialized
+		) {
+			console.log(`New value prop received for ${id}, updating content`);
+
+			try {
+				// Parse the new content into Slate nodes
+				const newContent = deserializeHtml(value, singleLine);
+
+				// Only update if the content is actually different
+				const currentEditorHtml = serializeToHtml(
+					editor.children as Descendant[],
+					{
+						roles,
+						channels,
+						botId: botData?.id,
+						botName: botData?.username,
+					},
+					singleLine,
+				);
+
+				if (currentEditorHtml !== value) {
+					// Set the editor content
+					editor.children = newContent as unknown as Descendant[];
+					editor.onChange();
+
+					// Update our reference
+					lastValueRef.current = value;
+				}
+			} catch (error) {
+				console.error(`Error updating editor ${id} from props:`, error);
+			}
+		}
+	}, [value, id, editor, singleLine, roles, channels, botData]);
+
+	// Track tab visibility to handle editor state properly
+	const [isTabVisible, setIsTabVisible] = useState(true);
+	const [needsReset, setNeedsReset] = useState(false);
+	// Add flag to track if we're currently in a reset process
+	const isResettingRef = useRef(false);
+
+	// Add a useEffect to handle tab switching and preserve editor state
+	useEffect(() => {
+		// When component is mounted, restore from lastValueRef if needed
+		if (isMounted.current && lastValueRef.current) {
+			// Only update if the current value is empty but we have a stored value
+			if (!value && lastValueRef.current) {
+				onChange?.(lastValueRef.current);
+			}
+		}
+
+		// Add event listeners for tab visibility changes
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === "visible") {
+				setIsTabVisible(true);
+				// Don't trigger reset automatically - user will need to interact again
+			} else {
+				setIsTabVisible(false);
+				// Just save state without complex processing
+				if (editor.children && isEditing) {
+					try {
+						const currentValue = serializeToHtml(
+							editor.children as Descendant[],
+							{
+								roles,
+								channels,
+								botId: botData?.id,
+								botName: botData?.username,
+							},
+							singleLine,
+						);
+						if (currentValue) {
+							lastValueRef.current = currentValue;
+						}
+					} catch (err) {
+						console.error(`Error saving editor state:`, err);
+					}
+				}
+			}
+		};
+
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+
+		return () => {
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
+		};
+	}, [
+		value,
+		onChange,
+		editor,
+		roles,
+		channels,
+		botData,
+		singleLine,
+		isEditing,
+		id,
+	]);
+
+	// Completely disable the reset mechanism
+	useEffect(() => {
+		if (isTabVisible && needsReset && isMounted.current) {
+			// Instead of performing a complex reset, simply mark as not needing reset
+			console.log("Reset mechanism disabled to prevent loops");
+			setNeedsReset(false);
+		}
+	}, [isTabVisible, needsReset]);
+
+	// Add a MutationObserver to detect when the editor is removed from DOM and added back
+	useEffect(() => {
+		if (typeof window === "undefined" || !editorRef.current) return;
+
+		const observer = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				if (mutation.type === "childList") {
+					// Check if our editor was removed and added back (tab switching)
+					if (
+						mutation.addedNodes.length > 0 &&
+						// Only set needsReset if we're not already in the process of resetting
+						!needsReset &&
+						isTabVisible
+					) {
+						// Element was added back to DOM
+						// Use setTimeout to defer the state update until after render is complete
+						setTimeout(() => {
+							if (isMounted.current) {
+								setNeedsReset(true);
+							}
+						}, 0);
+					}
+				}
+			}
+		});
+
+		// Start observing the parent of our editor
+		if (editorRef.current.parentElement) {
+			observer.observe(editorRef.current.parentElement, {
+				childList: true,
+				subtree: true,
+			});
+		}
+
+		return () => {
+			observer.disconnect();
+		};
+	}, [needsReset, isTabVisible]);
+
+	useEffect(() => {
+		const fetchBotData = async () => {
+			try {
+				const botData = await getUser(process.env.NEXT_PUBLIC_BOT_ID || "");
+				if (botData && isMounted.current) {
+					setBotData(botData);
+				}
+			} catch (err) {
+				console.error("Failed to load bot data:", err);
+			}
+		};
+		fetchBotData();
+	}, []);
 
 	/** Load guild data from localStorage on mount */
 	useEffect(() => {
@@ -109,7 +441,7 @@ export function MentionTextarea({
 			const cacheKey = `guild-${guildId}`;
 			const cached = getCachedData<GuildData>(cacheKey);
 
-			if (cached?.data) {
+			if (cached?.data && isMounted.current) {
 				setRoles(cached.data.roles || []);
 				// Filter out category channels (type 4 is GUILD_CATEGORY) and ensure type is defined
 				const nonCategoryChannels = (cached.data.channels || []).filter(
@@ -126,27 +458,6 @@ export function MentionTextarea({
 		}
 	}, [guildId]);
 
-	/** Create the Slate editor instance exactly once. */
-	const editor = useMemo(() => {
-		const e = withHistory(withReact(createEditor()));
-
-		// Extend `isVoid` and `isInline` for mention elements
-		const { isVoid, isInline } = e;
-		e.isVoid = (element) => {
-			return element.type === "mention" ||
-				element.type === "mention-placeholder"
-				? true
-				: isVoid(element);
-		};
-		e.isInline = (element) => {
-			return element.type === "mention" ||
-				element.type === "mention-placeholder"
-				? true
-				: isInline(element);
-		};
-		return e;
-	}, []);
-
 	/** Expose this editor instance globally so we can do programmatic insertions. */
 	useEffect(() => {
 		if (typeof window !== "undefined") {
@@ -154,75 +465,148 @@ export function MentionTextarea({
 			if (!typedWindow.__slateEditorInstances) {
 				typedWindow.__slateEditorInstances = {};
 			}
-			typedWindow.__slateEditorInstances["mention-textarea"] = editor;
+			// Używamy id jako klucza, aby każdy edytor miał własny kontekst
+			typedWindow.__slateEditorInstances[id] = editor;
+
+			// Cleanup function to remove the editor instance when component unmounts
+			return () => {
+				if (typedWindow.__slateEditorInstances?.[id]) {
+					delete typedWindow.__slateEditorInstances[id];
+				}
+			};
 		}
-	}, [editor]);
+	}, [editor, id]);
 
-	/** Convert the incoming HTML string -> Slate nodes. */
+	/** Simplify the initial value logic to avoid reprocessing */
 	const initialValue = useMemo(() => {
-		if (!value) return [...EMPTY_VALUE];
+		if (!value && !lastValueRef.current) return [...EMPTY_VALUE];
 
-		// First, escape any existing HTML tags that shouldn't be parsed
-		const escapedValue = value
-			.replace(/&/g, "&amp;")
-			.replace(/</g, "&lt;")
-			.replace(/>/g, "&gt;")
-			.replace(/"/g, "&quot;")
-			.replace(/'/g, "&#039;");
+		// Use the last value if current value is empty (helps during tab switching)
+		const contentToProcess = value || lastValueRef.current;
 
-		// Replace both <id:customize> and plain "Roles & Channels" text with our special span
-		const processedValue = escapedValue
-			.replace(
-				/&lt;id:customize&gt;/g,
-				'<span class="mention-tag channel" data-type="mention" data-value="<id:customize>" data-mention-type="channel" contenteditable="false">Roles & Channels</span>',
-			)
-			.replace(
-				/Roles &amp; Channels/g,
-				'<span class="mention-tag channel" data-type="mention" data-value="<id:customize>" data-mention-type="channel" contenteditable="false">Roles & Channels</span>',
-			);
+		// If it's the same as last time, use cached result if available
+		const cacheKey = `${id}:${contentToProcess}`;
+		if (
+			contentToProcess === lastValueRef.current &&
+			deserializationCache.has(cacheKey)
+		) {
+			return deserializationCache.get(cacheKey) || [...EMPTY_VALUE];
+		}
 
-		return deserializeHtml(processedValue);
-	}, [value]);
+		// Store for future reference
+		lastValueRef.current = contentToProcess;
 
-	/** On every Slate change, re-serialize to HTML and fire `onChange`. */
+		// Parse the HTML directly
+		const result = deserializeHtml(contentToProcess, singleLine);
+		deserializationCache.set(cacheKey, result);
+		return result;
+	}, [value, id, singleLine]);
+
+	/** Simplify the editor change handler */
 	const handleEditorChange = useCallback(
 		(newValue: Descendant[]) => {
-			// 1) convert to HTML with transformation options
-			const html = serializeToHtml(newValue, {
-				roles,
-				channels,
-				botId: botData?.id,
-				botName: botData?.username,
-			});
+			// Only process changes if component is mounted
+			if (!isMounted.current) return;
 
-			// 2) check length if `maxLength` is given
+			// Convert to HTML with transformation options
+			const html = serializeToHtml(
+				newValue,
+				{
+					roles,
+					channels,
+					botId: botData?.id,
+					botName: botData?.username,
+				},
+				singleLine,
+			);
+
+			// Check length if maxLength is given
 			if (maxLength !== undefined && maxLength > 0) {
-				const plainText = html.replace(/<[^>]*>/g, ""); // remove tags
-				if (plainText.length > maxLength) {
-					// If it's exceeded, just do nothing or revert
-					return;
-				}
+				const plainText = html.replace(/<[^>]*>/g, "");
+				if (plainText.length > maxLength) return;
 			}
 
-			// 3) call onChange
-			onChange?.(html);
+			// Only update if value changed
+			if (html !== lastValueRef.current) {
+				lastValueRef.current = html;
+
+				// Call onChange with minimum delay
+				if (onChange) {
+					onChange(html);
+				}
+			}
 		},
-		[maxLength, onChange, roles, channels, botData],
+		[maxLength, onChange, roles, channels, botData, singleLine],
 	);
 
 	/** Keep track of focus so we can style the container if needed. */
 	const [focused, setFocused] = useState(false);
 	const handleFocus = useCallback(() => {
 		setFocused(true);
+		setIsEditing(true);
+
+		// Przy uzyskaniu focusu, sprawdź czy potrzebne jest zresetowanie edytora
+		if (needsReset && lastValueRef.current) {
+			try {
+				// Zresetuj edytor z ostatnią znaną wartością
+				const resetValue = deserializeHtml(lastValueRef.current, singleLine);
+
+				// Całkowicie czyścimy edytor przed ustawieniem nowej wartości
+				Transforms.deselect(editor);
+				Transforms.delete(editor, {
+					at: {
+						anchor: Editor.start(editor, []),
+						focus: Editor.end(editor, []),
+					},
+				});
+
+				// Ustawiamy nową wartość
+				editor.children = resetValue as unknown as Descendant[];
+				editor.onChange();
+			} catch (error) {
+				console.error("Error resetting editor on focus:", error);
+			}
+			setNeedsReset(false);
+		}
+
 		onFocus?.();
-	}, [onFocus]);
+	}, [onFocus, editor, needsReset, singleLine]);
 
 	const handleBlur = useCallback(
 		(e: React.FocusEvent<HTMLDivElement>) => {
 			setFocused(false);
+
+			// Ensure we save the current state before losing focus
+			const currentValue = serializeToHtml(
+				editor.children as Descendant[],
+				{
+					roles,
+					channels,
+					botId: botData?.id,
+					botName: botData?.username,
+				},
+				singleLine,
+			);
+
+			if (currentValue) {
+				lastValueRef.current = currentValue;
+				// Use setTimeout to defer the state update until after render is complete
+				setTimeout(() => {
+					if (isMounted.current && onChange) {
+						onChange(currentValue);
+					}
+				}, 0);
+			}
+
+			// Small delay to ensure any pending changes are processed
+			setTimeout(() => {
+				if (isMounted.current) {
+					setIsEditing(false);
+				}
+			}, 100);
 			onBlur?.(e);
 		},
-		[onBlur],
+		[onBlur, editor, roles, channels, botData, onChange, singleLine],
 	);
 
 	// Add useEffect to handle initial focus
@@ -336,6 +720,23 @@ export function MentionTextarea({
 		"focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
 		className,
 	);
+
+	// When cleaning up editorRef, also remove editor from the instance cache:
+	useEffect(() => {
+		return () => {
+			// When component completely unmounts (not just tab switching),
+			// we should clean up the editor instance cache to prevent memory leaks
+			if (id && !document.getElementById(id)) {
+				// Use setTimeout to ensure this only happens after the component is fully unmounted
+				setTimeout(() => {
+					if (editorInstanceCache[id] && !document.getElementById(id)) {
+						console.log(`Cleaning up editor instance for id: ${id}`);
+						delete editorInstanceCache[id];
+					}
+				}, 5000); // Wait 5 seconds to make sure it's not just a tab switch
+			}
+		};
+	}, [id]);
 
 	return (
 		<div
@@ -592,13 +993,13 @@ function MentionElementRenderer({
 		let displayText = mention.displayValue;
 		let mentionStyle = "bg-purple-100 text-purple-800 border-purple-300";
 
-		console.log("Rendering mention:", {
-			type: mention.mentionType,
-			value: mention.value,
-			displayValue: mention.displayValue,
-			availableChannels: channels,
-			availableRoles: roles,
-		});
+		// console.log("Rendering mention:", {
+		// 	type: mention.mentionType,
+		// 	value: mention.value,
+		// 	displayValue: mention.displayValue,
+		// 	availableChannels: channels,
+		// 	availableRoles: roles,
+		// });
 
 		if (mention.mentionType === "role") {
 			mentionStyle = "bg-blue-100 text-blue-800 border-blue-300";
@@ -763,8 +1164,15 @@ function MentionElementRenderer({
 function serializeToHtml(
 	nodes: Descendant[],
 	transformOptions: TransformOptions = {},
+	singleLine = false,
 ): string {
-	return nodes
+	// Add a defensive check for empty nodes
+	if (!nodes || nodes.length === 0) {
+		console.log("serializeToHtml received empty nodes array");
+		return "";
+	}
+
+	let result = nodes
 		.map((node) => {
 			if (Text.isText(node)) {
 				return transformText(node.text, transformOptions);
@@ -774,6 +1182,14 @@ function serializeToHtml(
 					case "mention": {
 						const mention = node as MentionElement;
 						const safeValue = (mention.value || "").trim(); // Trim the value to remove newlines
+
+						// IMPORTANT: Sanitize the mention value to prevent HTML corruption
+						// This is critical for preventing content corruption during serialization
+						const sanitizedValue = safeValue
+							.replace(/</g, "&lt;")
+							.replace(/>/g, "&gt;")
+							.replace(/"/g, "&quot;")
+							.replace(/'/g, "&#039;");
 
 						// Transform mentions using the same logic as display
 						let displayValue = safeValue;
@@ -815,10 +1231,26 @@ function serializeToHtml(
 							displayValue = safeValue.slice(1, -1);
 						}
 
-						return `<span data-type="mention" data-value="${safeValue}" contenteditable="false">${displayValue}</span>`;
+						// Sanitize the display value too
+						const sanitizedDisplay = displayValue
+							.replace(/</g, "&lt;")
+							.replace(/>/g, "&gt;")
+							.replace(/"/g, "&quot;")
+							.replace(/'/g, "&#039;");
+
+						// Use the sanitized values to prevent corruption
+						return `<span data-type="mention" data-value="${sanitizedValue}" contenteditable="false">${sanitizedDisplay}</span>`;
 					}
 					case "paragraph":
-						return `<p>${serializeToHtml(node.children, transformOptions)}</p>\n`;
+						// For single-line inputs, don't wrap content in paragraph tags
+						if (singleLine) {
+							return serializeToHtml(
+								node.children,
+								transformOptions,
+								singleLine,
+							);
+						}
+						return `<p>${serializeToHtml(node.children, transformOptions, singleLine)}</p>\n`;
 					case "mention-placeholder": {
 						const m = node as MentionPlaceholderElement;
 						const safeValue = (m.children[0]?.text || "").trim();
@@ -827,7 +1259,11 @@ function serializeToHtml(
 					default: {
 						const unknownElement = node as { children?: Descendant[] };
 						return unknownElement.children
-							? serializeToHtml(unknownElement.children, transformOptions)
+							? serializeToHtml(
+									unknownElement.children,
+									transformOptions,
+									singleLine,
+								)
 							: "";
 					}
 				}
@@ -835,152 +1271,184 @@ function serializeToHtml(
 			return "";
 		})
 		.join("");
+
+	// For single-line inputs, ensure we don't have any paragraph tags
+	if (singleLine) {
+		// Remove any paragraph tags that might have been added
+		result = result.replace(/<\/?p>/g, "");
+	}
+
+	return result;
 }
 
 /* -------------------------------------------------------------
    DESERIALIZE: from HTML -> Slate
    ------------------------------------------------------------- */
-function deserializeHtml(html: string): ParagraphElement[] {
-	if (!html || typeof html !== "string") return [...EMPTY_VALUE];
+function deserializeHtml(html: string, singleLine = false): ParagraphElement[] {
+	// If the input is empty, return an empty paragraph
+	if (!html || html.trim() === "") {
+		return [{ type: "paragraph", children: [{ text: "" }] }];
+	}
 
-	const cached = deserializationCache.get(html);
-	if (cached) return cached;
+	// Process the HTML minimally
+	let processedHtml = html;
+	if (singleLine) {
+		processedHtml = processedHtml.replace(/<\/?p>/g, "");
+	}
 
-	// Pre-process any remaining "Roles & Channels" text that might be in plain text
-	const processedHtml = html.replace(
-		/Roles & Channels/g,
-		'<span data-type="mention" data-value="<id:customize>" data-mention-type="channel" contenteditable="false">Roles & Channels</span>',
-	);
-
+	// Create a DOM element to parse
 	const div = document.createElement("div");
 	div.innerHTML = processedHtml;
 
 	const result: ParagraphElement[] = [];
-	const currentParagraph: Array<CustomText | MentionElement> = [];
-
-	// Helper function to process text and extract mentions
-	const processText = (text: string): Array<CustomText | MentionElement> => {
-		const parts: Array<CustomText | MentionElement> = [];
-		let currentIndex = 0;
-
-		// Regular expressions for different types of mentions
-		const mentionRegex = /<(@&?\d+|#\d+)>|\{([^}]+)\}|<id:([^>]+?)>/g;
-
-		// Process all matches
-		const processNextMatch = () => {
-			const match = mentionRegex.exec(text);
-			if (!match) return false;
-
-			// Add text before the mention, preserving spaces
-			if (match.index > currentIndex) {
-				parts.push({ text: text.slice(currentIndex, match.index) });
-			}
-
-			const fullMatch = match[0];
-			let mentionType = guessMentionType(fullMatch);
-			let displayValue = fullMatch;
-
-			// Special handling for <id:customize>
-			if (fullMatch.startsWith("<id:")) {
-				const id = fullMatch.slice(4, -1);
-				if (id.toLowerCase() === "customize") {
-					displayValue = "Roles & Channels";
-					mentionType = "channel";
-				}
-			}
-
-			// Create mention element based on the type
-			const mentionElement: MentionElement = {
-				type: "mention",
-				mentionType,
-				value: fullMatch,
-				displayValue,
-				children: [{ text: "" }],
-			};
-
-			parts.push(mentionElement);
-			currentIndex = match.index + fullMatch.length;
-			return true;
-		};
-
-		// Process all matches
-		while (processNextMatch()) {
-			// Continue processing
-		}
-
-		// Add remaining text, preserving spaces
-		if (currentIndex < text.length) {
-			parts.push({ text: text.slice(currentIndex) });
-		}
-
-		return parts;
-	};
+	let currentParagraph: ParagraphElement = { type: "paragraph", children: [] };
 
 	// Process all nodes
-	const processNode = (node: Node) => {
-		if (node.nodeType === Node.TEXT_NODE) {
-			const text = node.textContent || "";
-			if (text) {
-				currentParagraph.push(...processText(text));
-			}
-		} else if (node.nodeType === Node.ELEMENT_NODE) {
-			const el = node as HTMLElement;
-			if (el.tagName === "BR" || el.tagName === "P") {
-				if (currentParagraph.length > 0) {
-					result.push({ type: "paragraph", children: [...currentParagraph] });
-					currentParagraph.length = 0;
-				}
-				if (el.tagName === "P") {
-					for (const child of el.childNodes) {
-						processNode(child);
-					}
-					if (currentParagraph.length > 0) {
-						result.push({ type: "paragraph", children: [...currentParagraph] });
-						currentParagraph.length = 0;
-					}
-				}
-			} else if (el.dataset?.type === "mention") {
-				const val = el.dataset.value || "";
-				let displayValue = el.textContent || val;
-
-				if (
-					val.startsWith("<id:") &&
-					val.slice(4, -1).toLowerCase() === "customize"
-				) {
-					displayValue = "Roles & Channels";
-				}
-
-				currentParagraph.push({
-					type: "mention",
-					mentionType: guessMentionType(val),
-					value: val,
-					displayValue,
-					children: [{ text: "" }],
-				});
-			} else {
-				for (const child of el.childNodes) {
-					processNode(child);
-				}
-			}
-		}
-	};
-
-	// Process all block nodes
 	for (const node of div.childNodes) {
 		processNode(node);
 	}
 
-	// Add any remaining content as a final paragraph
-	if (currentParagraph.length > 0) {
-		result.push({ type: "paragraph", children: [...currentParagraph] });
+	// Add the last paragraph if it has content
+	if (currentParagraph.children.length > 0) {
+		result.push(currentParagraph);
 	}
 
+	// Ensure we have at least one paragraph
 	if (result.length === 0) {
 		result.push({ type: "paragraph", children: [{ text: "" }] });
 	}
 
-	deserializationCache.set(html, result);
 	return result;
+
+	// Functions processText and processNode remain the same
+	function processText(text: string): Array<CustomText | MentionElement> {
+		const result: Array<CustomText | MentionElement> = [];
+		let remainingText = text;
+
+		// Define patterns for different mention types
+		const patterns = [
+			{ regex: /<@&(\d+)>/g, type: "role" as MentionType },
+			{ regex: /<#(\d+)>/g, type: "channel" as MentionType },
+			{ regex: /{([^}]+)}/g, type: "variable" as MentionType },
+			{ regex: /<id:([^>]+)>/g, type: "role" as MentionType }, // Custom format
+		];
+
+		const processNextMatch = () => {
+			let earliestMatch: {
+				index: number;
+				length: number;
+				value: string;
+				type: MentionType;
+			} | null = null;
+
+			// Find the earliest match across all patterns
+			for (const pattern of patterns) {
+				pattern.regex.lastIndex = 0; // Reset regex state
+				const match = pattern.regex.exec(remainingText);
+				if (
+					match &&
+					(earliestMatch === null || match.index < earliestMatch.index)
+				) {
+					earliestMatch = {
+						index: match.index,
+						length: match[0].length,
+						value: match[0],
+						type: pattern.type,
+					};
+				}
+			}
+
+			if (earliestMatch) {
+				// Add text before the match
+				if (earliestMatch.index > 0) {
+					result.push({
+						text: remainingText.substring(0, earliestMatch.index),
+					});
+				}
+
+				// Add the mention
+				result.push({
+					type: "mention",
+					mentionType: earliestMatch.type,
+					value: earliestMatch.value,
+					displayValue: earliestMatch.value,
+					children: [{ text: "" }],
+				});
+
+				// Continue with the rest of the text
+				remainingText = remainingText.substring(
+					earliestMatch.index + earliestMatch.length,
+				);
+				processNextMatch();
+			} else {
+				// No more matches, add the remaining text
+				if (remainingText) {
+					result.push({ text: remainingText });
+				}
+			}
+		};
+
+		processNextMatch();
+		return result;
+	}
+
+	function processNode(node: Node) {
+		if (node.nodeType === Node.TEXT_NODE) {
+			// Text node - process it for mentions
+			const textContent = node.textContent || "";
+			currentParagraph.children.push(...processText(textContent));
+		} else if (node.nodeType === Node.ELEMENT_NODE) {
+			const element = node as HTMLElement;
+
+			// Handle mention spans
+			if (
+				element.tagName === "SPAN" &&
+				element.getAttribute("data-type") === "mention"
+			) {
+				const value = element.getAttribute("data-value") || "";
+				const mentionType =
+					element.getAttribute("data-mention-type") || guessMentionType(value);
+
+				currentParagraph.children.push({
+					type: "mention",
+					mentionType: mentionType as MentionType,
+					value,
+					displayValue: element.textContent || value,
+					children: [{ text: "" }],
+				});
+			}
+			// Handle paragraph breaks
+			else if (element.tagName === "P" || element.tagName === "DIV") {
+				// If we already have content in the current paragraph, add it to results
+				if (currentParagraph.children.length > 0) {
+					result.push(currentParagraph);
+					currentParagraph = { type: "paragraph", children: [] };
+				}
+
+				// Process all child nodes
+				Array.from(element.childNodes).forEach(processNode);
+
+				// If this is a paragraph element and not the last one, add a new paragraph
+				if (element.tagName === "P" && element.nextElementSibling) {
+					if (currentParagraph.children.length > 0) {
+						result.push(currentParagraph);
+						currentParagraph = { type: "paragraph", children: [] };
+					}
+				}
+			}
+			// Handle line breaks
+			else if (element.tagName === "BR") {
+				if (currentParagraph.children.length > 0) {
+					result.push(currentParagraph);
+					currentParagraph = { type: "paragraph", children: [] };
+				}
+			}
+			// Handle other elements (just process their children)
+			else {
+				Array.from(element.childNodes).forEach(processNode);
+			}
+		}
+	}
 }
 
 /** Quick guess: if it starts with "<@", it's role; if "<#", channel; if "{" variable, else variable. */
@@ -1054,5 +1522,20 @@ function transformText(text: string, options: TransformOptions = {}): string {
 			})
 			// Replace URLs
 			.replace(/(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g, '<a href="$1">$1</a>')
+	);
+}
+
+// Clean HTML function to be used throughout the component
+function sanitizeHtml(html: string): string {
+	if (!html) return "";
+
+	// Only do minimal processing to fix known issues
+	return (
+		html
+			// Fix doubly-escaped entities
+			.replace(/&amp;lt;/g, "&lt;")
+			.replace(/&amp;gt;/g, "&gt;")
+			.replace(/&amp;quot;/g, "&quot;")
+			.replace(/&amp;amp;/g, "&amp;")
 	);
 }
