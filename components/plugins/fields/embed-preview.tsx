@@ -118,7 +118,39 @@ function EmbedImage({
 	alt,
 	size = "large",
 }: { url?: string; alt: string; size?: "small" | "large" }) {
-	if (!url) {
+	// Sprawdź, czy URL jest prawidłowy
+	const isValidUrl = (urlString: string): boolean => {
+		try {
+			// Sprawdź, czy URL jest nieprawidłowy
+			if (!urlString) {
+				return false;
+			}
+
+			// Sprawdź, czy URL zawiera zmienne
+			if (urlString.includes("{") || urlString.includes("}")) {
+				return false;
+			}
+
+			// Sprawdź, czy URL zaczyna się od http lub https
+			if (
+				!urlString.startsWith("http://") &&
+				!urlString.startsWith("https://")
+			) {
+				return false;
+			}
+
+			// Spróbuj utworzyć obiekt URL, aby sprawdzić, czy URL jest prawidłowy
+			new URL(urlString);
+			return true;
+		} catch (e) {
+			console.error("Invalid URL:", urlString, e);
+			return false;
+		}
+	};
+
+	// Jeśli URL jest nieprawidłowy lub pusty, pokaż placeholder
+	if (!url || !isValidUrl(url)) {
+		console.log("Using placeholder for invalid URL:", url);
 		return <ImagePlaceholder size={size} />;
 	}
 
@@ -232,8 +264,54 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 
 		if (!text) return "";
 
+		// Funkcja do usuwania znaczników HTML
+		const stripHtmlTags = (html: string): string => {
+			// Jeśli tekst zawiera znaczniki HTML, usuń je
+			if (html.includes("<") && html.includes(">")) {
+				// Tymczasowy element do parsowania HTML
+				const temp = document.createElement("div");
+				temp.innerHTML = html;
+				return temp.textContent || "";
+			}
+			return html;
+		};
+
+		// Sprawdź, czy tekst zawiera proste znaczniki HTML
+		const hasSimpleHtml =
+			text.includes("<p>") ||
+			text.includes("</p>") ||
+			text.includes("<div>") ||
+			text.includes("</div>") ||
+			text.includes("<br>") ||
+			text.includes("<br/>") ||
+			text.includes("<span>") ||
+			text.includes("</span>");
+
+		// Sprawdź, czy tekst zawiera zaawansowane formatowanie
+		const hasAdvancedFormatting =
+			text.includes('data-mention-type="variable"') ||
+			text.includes("data-slate-node") ||
+			text.includes("mention") ||
+			text.includes("<strong>") ||
+			text.includes("<em>") ||
+			text.includes("<u>") ||
+			text.includes("<del>") ||
+			text.includes("<code>");
+
+		// Jeśli mamy proste HTML bez zaawansowanego formatowania, usuń znaczniki
+		let processableText = text;
+		if (hasSimpleHtml && !hasAdvancedFormatting) {
+			processableText = stripHtmlTags(text);
+			console.log(
+				"[formatTextVariables] Stripped HTML tags from:",
+				text,
+				"to:",
+				processableText,
+			);
+		}
+
 		// Handle the special <id:customize> format for the Roles & Channels option
-		let processedText = text.replace(/<id:customize>/g, (match) => {
+		let processedText = processableText.replace(/<id:customize>/g, (match) => {
 			console.log("[formatTextVariables] Processing customize mention");
 			const span = `<span class="mention customize-mention" data-mention-type="channel" data-mention-value="customize">Roles & Channels</span>`;
 			console.log(
@@ -366,66 +444,115 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 
 			console.log("[processVariables] input:", text, "isTitle:", isTitle);
 
+			// Funkcja do usuwania znaczników HTML
+			const stripHtmlTags = (html: string): string => {
+				// Jeśli tekst zawiera znaczniki HTML, usuń je
+				if (html.includes("<") && html.includes(">")) {
+					// Tymczasowy element do parsowania HTML
+					const temp = document.createElement("div");
+					temp.innerHTML = html;
+					return temp.textContent || "";
+				}
+				return html;
+			};
+
+			// Sprawdź, czy tekst zawiera proste znaczniki HTML
+			const hasSimpleHtml =
+				text.includes("<p>") ||
+				text.includes("</p>") ||
+				text.includes("<div>") ||
+				text.includes("</div>") ||
+				text.includes("<br>") ||
+				text.includes("<br/>") ||
+				text.includes("<span>") ||
+				text.includes("</span>");
+
+			// Sprawdź, czy tekst zawiera zaawansowane formatowanie
+			const hasAdvancedFormatting =
+				text.includes('data-mention-type="variable"') ||
+				text.includes("data-slate-node") ||
+				text.includes("mention") ||
+				text.includes("<strong>") ||
+				text.includes("<em>") ||
+				text.includes("<u>") ||
+				text.includes("<del>") ||
+				text.includes("<code>");
+
+			// Jeśli mamy proste HTML bez zaawansowanego formatowania, usuń znaczniki
+			let processableText = text;
+			if (hasSimpleHtml && !hasAdvancedFormatting) {
+				processableText = stripHtmlTags(text);
+				console.log(
+					"[processVariables] Stripped HTML tags from:",
+					text,
+					"to:",
+					processableText,
+				);
+			}
+
 			// First, handle direct variable replacements for display in the preview
-			const processedText = text.replace(/\{([^{}]+)\}/g, (match, variable) => {
-				console.log("[processVariables] Processing variable:", variable);
+			const processedText = processableText.replace(
+				/\{([^{}]+)\}/g,
+				(match, variable) => {
+					console.log("[processVariables] Processing variable:", variable);
 
-				// Always get fresh values from latest state
-				let value = "";
+					// Always get fresh values from latest state
+					let value = "";
 
-				switch (variable) {
-					case "server_name": {
-						value = guildData?.name || "Server";
-						console.log(
-							"[processVariables] server_name value:",
-							value,
-							"guildData:",
-							guildData?.name,
-						);
-						break;
+					switch (variable) {
+						case "server_name": {
+							value = guildData?.name || "Server";
+							console.log(
+								"[processVariables] server_name value:",
+								value,
+								"guildData:",
+								guildData?.name,
+							);
+							break;
+						}
+						case "server_id": {
+							value = guildData?.id || "Unknown";
+							console.log("[processVariables] server_id value:", value);
+							break;
+						}
+						case "member_count": {
+							value =
+								guildData?.guild_details?.approximate_member_count?.toString() ||
+								"0";
+							console.log("[processVariables] member_count value:", value);
+							break;
+						}
+						case "user":
+						case "user.username": {
+							value = userData?.username || "user";
+							console.log(
+								"[processVariables] user variable. userData:",
+								userData,
+								"value:",
+								value,
+							);
+							break;
+						}
+						default: {
+							value = match;
+							console.log(
+								"[processVariables] default variable:",
+								variable,
+								"value:",
+								value,
+							);
+							break;
+						}
 					}
-					case "server_id": {
-						value = guildData?.id || "Unknown";
-						console.log("[processVariables] server_id value:", value);
-						break;
-					}
-					case "member_count": {
-						value =
-							guildData?.guild_details?.approximate_member_count?.toString() ||
-							"0";
-						console.log("[processVariables] member_count value:", value);
-						break;
-					}
-					case "user":
-					case "user.username": {
-						value = userData?.username || "user";
-						console.log(
-							"[processVariables] user variable. userData:",
-							userData,
-							"value:",
-							value,
-						);
-						break;
-					}
-					default: {
-						value = match;
-						console.log(
-							"[processVariables] default variable:",
-							variable,
-							"value:",
-							value,
-						);
-						break;
-					}
-				}
 
-				if (isTitle) {
-					return value;
-				}
+					if (isTitle) {
+						return value;
+					}
 
-				// For non-title text, wrap in a formatted span
-				return `<span data-slate-node="element" data-slate-inline="true" data-slate-void="true" contenteditable="false" class="rounded-md px-1.5 py-0.5 text-sm select-all border cursor-default font-medium bg-amber-100 text-amber-800 border-amber-300" data-mention-type="variable" data-mention-value="${variable}">${value}</span>`;
-			});
+					// For non-title text, wrap in a formatted span
+					return `<span data-slate-node="element" data-slate-inline="true" data-slate-void="true" contenteditable="false" class="rounded-md px-1.5 py-0.5 text-sm select-all border cursor-default font-medium bg-amber-100 text-amber-800 border-amber-300" data-mention-type="variable" data-mention-value="${variable}">${value}</span>`;
+				},
+			);
 
 			console.log(
 				"[processVariables] after variable replacement:",
@@ -441,6 +568,44 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 	const formatText = (text: string) => {
 		if (!text) return text;
 
+		// Funkcja do usuwania znaczników HTML
+		const stripHtmlTags = (html: string): string => {
+			// Jeśli tekst zawiera znaczniki HTML, usuń je
+			if (html.includes("<") && html.includes(">")) {
+				// Tymczasowy element do parsowania HTML
+				const temp = document.createElement("div");
+				temp.innerHTML = html;
+				return temp.textContent || "";
+			}
+			return html;
+		};
+
+		// Sprawdź, czy tekst zawiera proste znaczniki HTML
+		const hasSimpleHtml =
+			text.includes("<p>") ||
+			text.includes("</p>") ||
+			text.includes("<div>") ||
+			text.includes("</div>") ||
+			text.includes("<br>") ||
+			text.includes("<br/>") ||
+			text.includes("<span>") ||
+			text.includes("</span>");
+
+		// Sprawdź, czy tekst zawiera zaawansowane formatowanie
+		const hasAdvancedFormatting =
+			text.includes('data-mention-type="variable"') ||
+			text.includes("data-slate-node") ||
+			text.includes("mention") ||
+			text.includes("<strong>") ||
+			text.includes("<em>") ||
+			text.includes("<u>") ||
+			text.includes("<del>") ||
+			text.includes("<code>");
+
+		// Jeśli mamy proste HTML bez zaawansowanego formatowania, usuń znaczniki
+		const textWithoutHtml =
+			hasSimpleHtml && !hasAdvancedFormatting ? stripHtmlTags(text) : text;
+
 		type TextSegment = {
 			text: string;
 			isFormatted: boolean;
@@ -448,7 +613,9 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 		};
 
 		// Start with the text as a single segment
-		let segments: TextSegment[] = [{ text, isFormatted: false }];
+		let segments: TextSegment[] = [
+			{ text: textWithoutHtml, isFormatted: false },
+		];
 
 		// Apply each formatting pattern
 		for (const { pattern, renderer } of TEXT_FORMATS) {
@@ -565,8 +732,54 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 
 		console.log("parseTitleContent input:", content);
 
+		// Funkcja do usuwania znaczników HTML
+		const stripHtmlTags = (html: string): string => {
+			// Jeśli tekst zawiera znaczniki HTML, usuń je
+			if (html.includes("<") && html.includes(">")) {
+				// Tymczasowy element do parsowania HTML
+				const temp = document.createElement("div");
+				temp.innerHTML = html;
+				return temp.textContent || "";
+			}
+			return html;
+		};
+
+		// Sprawdź, czy tekst zawiera proste znaczniki HTML
+		const hasSimpleHtml =
+			content.includes("<p>") ||
+			content.includes("</p>") ||
+			content.includes("<div>") ||
+			content.includes("</div>") ||
+			content.includes("<br>") ||
+			content.includes("<br/>") ||
+			content.includes("<span>") ||
+			content.includes("</span>");
+
+		// Sprawdź, czy tekst zawiera zaawansowane formatowanie
+		const hasAdvancedFormatting =
+			content.includes('data-mention-type="variable"') ||
+			content.includes("data-slate-node") ||
+			content.includes("mention") ||
+			content.includes("<strong>") ||
+			content.includes("<em>") ||
+			content.includes("<u>") ||
+			content.includes("<del>") ||
+			content.includes("<code>");
+
+		// Jeśli mamy proste HTML bez zaawansowanego formatowania, usuń znaczniki
+		let processableContent = content;
+		if (hasSimpleHtml && !hasAdvancedFormatting) {
+			processableContent = stripHtmlTags(content);
+			console.log(
+				"parseTitleContent: Stripped HTML tags from:",
+				content,
+				"to:",
+				processableContent,
+			);
+		}
+
 		// First, apply direct variable replacements
-		const processedContent = processVariables(content, true);
+		const processedContent = processVariables(processableContent, true);
 		console.log("parseTitleContent after processVariables:", processedContent);
 
 		// If the content includes variables in span format, we need to process them
@@ -1017,9 +1230,58 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 		asFragment = false,
 	): ReactElement[] | string => {
 		try {
+			// Funkcja do usuwania znaczników HTML
+			const stripHtmlTags = (html: string): string => {
+				// Jeśli tekst zawiera znaczniki HTML, usuń je
+				if (html.includes("<") && html.includes(">")) {
+					// Tymczasowy element do parsowania HTML
+					const temp = document.createElement("div");
+					temp.innerHTML = html;
+					return temp.textContent || "";
+				}
+				return html;
+			};
+
+			// Sprawdź, czy content zawiera proste znaczniki HTML
+			const hasSimpleHtml =
+				content.includes("<p>") ||
+				content.includes("</p>") ||
+				content.includes("<div>") ||
+				content.includes("</div>") ||
+				content.includes("<br>") ||
+				content.includes("<br/>") ||
+				content.includes("<span>") ||
+				content.includes("</span>");
+
+			// Sprawdź, czy content zawiera zaawansowane formatowanie
+			const hasAdvancedFormatting =
+				content.includes('data-mention-type="variable"') ||
+				content.includes("data-slate-node") ||
+				content.includes("mention") ||
+				content.includes("<strong>") ||
+				content.includes("<em>") ||
+				content.includes("<u>") ||
+				content.includes("<del>") ||
+				content.includes("<code>");
+
+			// Jeśli mamy proste HTML bez zaawansowanego formatowania, usuń znaczniki
+			let processableContent = content;
+			if (hasSimpleHtml && !hasAdvancedFormatting) {
+				processableContent = stripHtmlTags(content);
+				console.log(
+					"Stripped HTML tags from content:",
+					content,
+					"to:",
+					processableContent,
+				);
+			}
+
+			// Napraw potencjalnie uszkodzone tagi span
+			const fixedContent = processableContent;
+
 			// Always apply variable replacements for content to ensure variables are formatted
 			// This ensures that {server_name}, {user}, etc. are always replaced with their values
-			const processedContent = formatTextVariables(content);
+			const processedContent = formatTextVariables(fixedContent);
 
 			// Define strings to check for
 			const mentionTypeStr = 'data-type="mention"';
@@ -1169,7 +1431,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 			? avatarUrl(userData.id, userData.avatar, 128, true)
 			: undefined;
 
-	// Process image URLs
+	// Process image URLs - używamy resolveImageUrl do przetworzenia URL-i
 	const thumbnailUrl = processedEmbed?.thumbnail?.url
 		? resolveImageUrl(processedEmbed.thumbnail.url)
 		: undefined;

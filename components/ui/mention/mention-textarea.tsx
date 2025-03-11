@@ -260,6 +260,28 @@ const createSlateEditor = (id: string): ExtendedEditor => {
 	return newEditor;
 };
 
+// Add this function before the MentionTextarea component
+interface PlaceholderProps {
+	children: React.ReactNode;
+	attributes: React.HTMLAttributes<HTMLSpanElement>;
+}
+
+function CustomPlaceholder({ children, attributes }: PlaceholderProps) {
+	return (
+		<span
+			{...attributes}
+			className="text-muted-foreground absolute inset-0 px-3 py-2 pointer-events-none select-none opacity-60 overflow-hidden whitespace-nowrap text-ellipsis"
+			style={{
+				userSelect: "none",
+				pointerEvents: "none",
+				display: "inline-block",
+			}}
+		>
+			{children}
+		</span>
+	);
+}
+
 // The main component
 export function MentionTextarea({
 	value = "",
@@ -640,7 +662,7 @@ export function MentionTextarea({
 
 	// Combine our classes
 	const editorClasses = cn(
-		"w-full border border-input rounded-md bg-background text-sm",
+		"relative w-full border border-input rounded-md bg-background text-sm",
 		singleLine ? "h-10 overflow-y-hidden overflow-x-auto" : "overflow-y-auto",
 		"px-3 py-2",
 		// focused ? "ring-1 ring-ring" : "",
@@ -663,6 +685,11 @@ export function MentionTextarea({
 					spellCheck
 					onKeyDown={handleKeyDown}
 					onMouseDown={handleMouseDown}
+					renderPlaceholder={({ children, attributes }) => (
+						<CustomPlaceholder attributes={attributes}>
+							{children}
+						</CustomPlaceholder>
+					)}
 					renderElement={(props) => (
 						<MentionElementRenderer
 							{...props}
@@ -1088,6 +1115,10 @@ function MentionElementRenderer({
 		} else if (mention.mentionType === "variable") {
 			// Variables are stored as is
 			displayText = mention.value;
+			// Remove curly braces if present
+			if (displayText.startsWith("{") && displayText.endsWith("}")) {
+				displayText = displayText.slice(1, -1);
+			}
 		}
 
 		return (
@@ -1415,11 +1446,16 @@ function deserializeHtml(html: string, singleLine = false): ParagraphElement[] {
 	);
 
 	// Fifth pass: Handle variables in {variable_name} format
-	processedHtml = processedHtml.replace(/\{([^}]+)\}/g, (match, variableName) =>
-		DOMPurify.sanitize(
-			`<span data-type="mention" data-value="${variableName}" data-mention-type="variable" contenteditable="false">${variableName}</span>`,
-			purifyConfig,
-		),
+	processedHtml = processedHtml.replace(
+		/\{([^}]+)\}/g,
+		(match, variableName) => {
+			// Usuwamy nawiasy klamrowe z nazwy zmiennej
+			const cleanVariableName = variableName.trim();
+			return DOMPurify.sanitize(
+				`<span data-type="mention" data-value="${cleanVariableName}" data-mention-type="variable" contenteditable="false">${cleanVariableName}</span>`,
+				purifyConfig,
+			);
+		},
 	);
 
 	// Handle markdown-style formatting

@@ -1,7 +1,7 @@
 import { CommandItem } from "@/components/ui/command";
 import { Editor, Transforms, Element as SlateElement } from "slate";
 import { ReactEditor } from "slate-react";
-import type { Variable } from "@/components/ui/mention/mention-popover";
+import type { Variable } from "@/lib/variables";
 import type { MentionElement, VariableMentionElement } from "./types";
 
 interface VariableMentionProps {
@@ -31,7 +31,7 @@ export function VariableMention({
 					{
 						type: "mention",
 						mentionType: "variable",
-						value: `{${variable.id}}`,
+						value: variable.id,
 						displayValue: variable.name,
 						children: [{ text: "" }],
 					} as VariableMentionElement,
@@ -50,7 +50,7 @@ export function VariableMention({
 				Transforms.insertNodes(editor, {
 					type: "mention",
 					mentionType: "variable",
-					value: `{${variable.id}}`,
+					value: variable.id,
 					displayValue: variable.name,
 					children: [{ text: "" }],
 				} as VariableMentionElement);

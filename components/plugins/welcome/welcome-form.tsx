@@ -48,6 +48,30 @@ import { RoleField } from "../fields/role-field";
 import { ColorPicker } from "../fields/color-picker";
 import type { User } from "discord.js";
 import { MessageField } from "../fields/message-field";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+	Drawer,
+	DrawerClose,
+	DrawerContent,
+	DrawerDescription,
+	DrawerFooter,
+	DrawerHeader,
+	DrawerTitle,
+	DrawerTrigger,
+} from "@/components/ui/drawer";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ImageIcon, UploadIcon } from "lucide-react";
+import Image from "next/image";
 
 // Define interfaces for our types
 interface EmbedField {
@@ -165,6 +189,261 @@ const formSchema = z.object({
 
 interface WelcomeFormProps {
 	plugin: WelcomeGoodbye;
+}
+
+// ThumbnailSelector component
+interface ThumbnailSelectorProps {
+	value: string;
+	onChange: (value: string) => void;
+	guildData: GuildData;
+	userData: User | null;
+	label?: string;
+}
+
+function ThumbnailSelector({
+	value,
+	onChange,
+	guildData,
+	userData,
+	label,
+}: ThumbnailSelectorProps) {
+	const [open, setOpen] = React.useState(false);
+	const isDesktop = useMediaQuery("(min-width: 768px)");
+	const [selectedOption, setSelectedOption] = React.useState<string>(
+		value || "",
+	);
+	const [customUrl, setCustomUrl] = React.useState<string>(
+		value && !value.startsWith("{") ? value : "",
+	);
+	const [fileUpload, setFileUpload] = React.useState<File | null>(null);
+	const [previewUrl, setPreviewUrl] = React.useState<string>("");
+
+	// Predefined options
+	const options = [
+		{
+			id: "{server_image}",
+			label: "Server Image",
+			description: "Use the server's icon",
+		},
+		{
+			id: "{server_banner}",
+			label: "Server Banner",
+			description: "Use the server's banner",
+		},
+		{
+			id: "{avatar}",
+			label: "Bot Avatar",
+			description: "Use the bot's avatar",
+		},
+		{
+			id: "custom",
+			label: "Custom URL",
+			description: "Enter a custom image URL",
+		},
+		{
+			id: "upload",
+			label: "Upload Image",
+			description: "Upload your own image",
+		},
+	];
+
+	// Handle file selection
+	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (file) {
+			setFileUpload(file);
+			const url = URL.createObjectURL(file);
+			setPreviewUrl(url);
+			setSelectedOption("upload");
+		}
+	};
+
+	// Handle form submission
+	const handleSubmit = () => {
+		if (selectedOption === "custom" && customUrl) {
+			onChange(customUrl);
+		} else if (selectedOption === "upload" && previewUrl) {
+			// In a real implementation, you would upload the file to a server
+			// and get back a URL. For now, we'll just use the preview URL.
+			onChange(previewUrl);
+		} else if (selectedOption) {
+			onChange(selectedOption);
+		}
+		setOpen(false);
+	};
+
+	// Preview component for the thumbnail
+	const ThumbnailPreview = () => {
+		// Check if we have a valid URL or a variable
+		const hasValue = value && value.trim() !== "";
+		const isVariable = hasValue && value.startsWith("{");
+
+		// For variables, show a placeholder with the variable name
+		if (isVariable) {
+			let label = "Variable";
+			if (value === "{server_image}") label = "Server Image";
+			if (value === "{server_banner}") label = "Server Banner";
+			if (value === "{avatar}") label = "Bot Avatar";
+
+			return (
+				<div className="flex flex-col items-center justify-center rounded-md border-2 border-dashed border-gray-300 bg-gray-50 w-full text-center h-full">
+					<ImageIcon className="size-8 text-gray-400" />
+					{/* <span className="text-sm font-medium text-gray-500">{label}</span> */}
+				</div>
+			);
+		}
+
+		// For URLs, try to show the image
+		if (hasValue) {
+			return (
+				<div className="relative aspect-square w-full overflow-hidden rounded-md border border-gray-200 h-full">
+					<Image
+						src={value}
+						alt="Thumbnail"
+						fill
+						className="object-cover"
+						onError={(e) => {
+							// If image fails to load, show placeholder
+							e.currentTarget.style.display = "none";
+							e.currentTarget.nextElementSibling?.classList.remove("hidden");
+						}}
+					/>
+					<div className="hidden absolute inset-0 flex flex-col items-center justify-center bg-gray-50">
+						<ImageIcon className="mb-2 h-10 w-10 text-gray-400" />
+						<span className="text-sm font-medium text-gray-500">
+							Invalid image URL
+						</span>
+					</div>
+				</div>
+			);
+		}
+
+		// Default placeholder
+		return (
+			<div className="flex flex-col items-center justify-center rounded-md border-2 border-dashed border-gray-300 bg-gray-50 p-4 text-center h-full">
+				<ImageIcon className="mb-2 h-10 w-10 text-gray-400" />
+				<span className="text-sm font-medium text-gray-500">
+					{label || "Select image"}
+				</span>
+			</div>
+		);
+	};
+
+	// Content for both Dialog and Drawer
+	const ContentComponent = (
+		<div className="grid gap-4 py-4">
+			<RadioGroup
+				value={selectedOption}
+				onValueChange={setSelectedOption}
+				className="grid gap-3"
+			>
+				{options.map((option) => (
+					<div key={option.id} className="flex items-start space-x-3 space-y-0">
+						<RadioGroupItem value={option.id} id={option.id} />
+						<div className="grid gap-1.5 leading-none">
+							<Label htmlFor={option.id} className="font-medium">
+								{option.label}
+							</Label>
+							<p className="text-sm text-muted-foreground">
+								{option.description}
+							</p>
+						</div>
+					</div>
+				))}
+			</RadioGroup>
+
+			{selectedOption === "custom" && (
+				<div className="grid gap-2">
+					<Label htmlFor="custom-url">Custom URL</Label>
+					<Input
+						id="custom-url"
+						value={customUrl}
+						onChange={(e) => setCustomUrl(e.target.value)}
+						placeholder="https://example.com/image.png"
+					/>
+				</div>
+			)}
+
+			{selectedOption === "upload" && (
+				<div className="grid gap-2">
+					<Label htmlFor="image-upload">Upload Image</Label>
+					<div className="grid gap-2">
+						<Input
+							id="image-upload"
+							type="file"
+							accept="image/*"
+							onChange={handleFileChange}
+						/>
+						{previewUrl && (
+							<div className="mt-2 aspect-square w-full max-w-[200px] overflow-hidden rounded-md border">
+								<Image
+									src={previewUrl}
+									alt="Preview"
+									width={200}
+									height={200}
+									className="h-full w-full object-cover"
+								/>
+							</div>
+						)}
+					</div>
+				</div>
+			)}
+
+			<Button onClick={handleSubmit} className="mt-4">
+				Save
+			</Button>
+		</div>
+	);
+
+	// Render Dialog on desktop, Drawer on mobile
+	if (isDesktop) {
+		return (
+			<div className="h-full">
+				<Dialog open={open} onOpenChange={setOpen}>
+					<DialogTrigger asChild>
+						<Button variant="ghost" className="size-25 mt-21 p-0 border-0">
+							<ThumbnailPreview />
+						</Button>
+					</DialogTrigger>
+					<DialogContent className="sm:max-w-[425px]">
+						<DialogHeader>
+							<DialogTitle>Select Image</DialogTitle>
+							<DialogDescription>
+								Choose a predefined image or upload your own.
+							</DialogDescription>
+						</DialogHeader>
+						{ContentComponent}
+					</DialogContent>
+				</Dialog>
+			</div>
+		);
+	}
+
+	return (
+		<div className="h-full">
+			<Drawer open={open} onOpenChange={setOpen}>
+				<DrawerTrigger asChild>
+					<Button variant="outline" className="w-full h-full p-0 border-0">
+						<ThumbnailPreview />
+					</Button>
+				</DrawerTrigger>
+				<DrawerContent>
+					<DrawerHeader className="text-left">
+						<DrawerTitle>Select Image</DrawerTitle>
+						<DrawerDescription>
+							Choose a predefined image or upload your own.
+						</DrawerDescription>
+					</DrawerHeader>
+					<div className="px-4">{ContentComponent}</div>
+					<DrawerFooter className="pt-2">
+						<DrawerClose asChild>
+							<Button variant="outline">Cancel</Button>
+						</DrawerClose>
+					</DrawerFooter>
+				</DrawerContent>
+			</Drawer>
+		</div>
+	);
 }
 
 export function WelcomeForm({ plugin }: WelcomeFormProps) {
@@ -562,90 +841,105 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 					>
 						<div className="grid grid-cols-2 gap-6">
 							<div className="space-y-4">
-								<FormField
-									control={form.control}
-									name="embed_welcome.color"
-									render={({ field }) => (
-										<FormItem>
-											<FormLabel>Color</FormLabel>
-											<FormDescription>
-												Choose the color of your welcome embed
-											</FormDescription>
-											<FormControl>
-												<ColorPicker
-													value={field.value || Colors.Blurple}
-													onChange={field.onChange}
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
+								<div className="flex gap-4">
+									<div className="flex-1 flex flex-col gap-4">
+										<FormField
+											control={form.control}
+											name="embed_welcome.color"
+											render={({ field }) => (
+												<FormItem>
+													<FormLabel>Stripe Color</FormLabel>
+													<FormControl>
+														<ColorPicker
+															value={field.value || Colors.Blurple}
+															onChange={field.onChange}
+														/>
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
 
-								<MessageField
-									name="embed_welcome.title"
-									label="Title"
-									description="The title of your welcome embed"
-									showEmojiPicker={false}
-									rows={1}
-									maxLength={100}
-									id="welcome-embed-title-field"
-								/>
+										<MessageField
+											name="embed_welcome.title"
+											label="Title"
+											// description="The title of your welcome embed"
+											showEmojiPicker={false}
+											rows={1}
+											maxLength={100}
+											id="welcome-embed-title-field"
+										/>
 
-								<MessageField
-									name="embed_welcome.description"
-									label="Description"
-									description="The main content of your welcome embed"
-									showEmojiPicker={false}
-									rows={4}
-									maxLength={500}
-									id="welcome-embed-description-field"
-								/>
+										<MessageField
+											name="embed_welcome.description"
+											label="Description"
+											// description="The main content of your welcome embed"
+											showEmojiPicker={false}
+											rows={4}
+											maxLength={500}
+											id="welcome-embed-description-field"
+										/>
 
-								<FormField
-									control={form.control}
-									name="embed_welcome.thumbnail.url"
-									render={({ field }) => (
-										<FormItem>
-											<FormLabel>Thumbnail URL</FormLabel>
-											<FormDescription>
-												Enter the URL for the thumbnail image
-											</FormDescription>
-											<FormControl>
-												<MentionTextarea
-													value={field.value || ""}
-													onChange={field.onChange}
-													variables={variables}
-													categories={categories}
-													placeholder="Enter URL or use {server_image}, {bot_avatar}"
-													singleLine
-													id="welcome-embed-thumbnail-field"
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
+										<EmbedFieldsEditor
+											name="embed_welcome.fields"
+											label="Fields"
+											// description="Add fields to your welcome embed"
+											id="welcome-embed-fields"
+										/>
 
-								<MessageField
-									name="embed_welcome.footer.text"
-									label="Footer"
-									description="Text that appears at the bottom of the welcome embed"
-									showEmojiPicker={false}
-									singleLine
-									maxLength={100}
-									id="welcome-embed-footer-field"
-								/>
+										<FormField
+											control={form.control}
+											name="embed_welcome.image.url"
+											render={({ field }) => (
+												<FormItem>
+													<FormControl>
+														{/* IMAGE SELECTOR */}
+														<ThumbnailSelector
+															value={field.value || ""}
+															onChange={field.onChange}
+															guildData={guildData || ({} as GuildData)}
+															userData={user}
+															label="Main Image"
+														/>
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
 
-								<EmbedFieldsEditor
-									name="embed_welcome.fields"
-									label="Fields"
-									description="Add fields to your welcome embed"
-									id="welcome-embed-fields"
-								/>
+										<MessageField
+											name="embed_welcome.footer.text"
+											label="Footer"
+											// description="Text that appears at the bottom of the welcome embed"
+											showEmojiPicker={false}
+											singleLine
+											maxLength={100}
+											id="welcome-embed-footer-field"
+										/>
+									</div>
+									<div className="flex-shrink-0 w-20 self-start">
+										<FormField
+											control={form.control}
+											name="embed_welcome.thumbnail.url"
+											render={({ field }) => (
+												<FormItem>
+													<FormControl>
+														<ThumbnailSelector
+															value={field.value || ""}
+															onChange={field.onChange}
+															guildData={guildData || ({} as GuildData)}
+															userData={user}
+															label="Thumbnail"
+														/>
+													</FormControl>
+												</FormItem>
+											)}
+										/>
+									</div>
+								</div>
 							</div>
 
-							<div className="sticky top-4">
+							<div className="sticky top-4 space-y-4">
 								<EmbedPreview
 									embed={formValues.type === "embed" ? previewEmbed : null}
 									guildData={
@@ -682,139 +976,146 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 					>
 						<div className="grid grid-cols-2 gap-6">
 							<div className="space-y-4">
-								<FormField
-									control={form.control}
-									name="embed_leave.color"
-									render={({ field }) => (
-										<FormItem>
-											<FormLabel>Color</FormLabel>
-											<FormDescription>
-												Choose the color of your leave embed
-											</FormDescription>
-											<FormControl>
-												<ColorPicker
-													value={field.value || Colors.Red}
-													onChange={field.onChange}
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
+								<div className="flex gap-4">
+									<div className="flex-1">
+										<FormField
+											control={form.control}
+											name="embed_leave.color"
+											render={({ field }) => (
+												<FormItem>
+													<FormLabel>Color</FormLabel>
+													<FormControl>
+														<ColorPicker
+															value={field.value || Colors.Red}
+															onChange={field.onChange}
+														/>
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
 
-								<FormField
-									control={form.control}
-									name="embed_leave.title"
-									render={({ field }) => (
-										<FormItem>
-											<FormLabel>Title</FormLabel>
-											<FormDescription>
-												The title of your leave embed
-											</FormDescription>
-											<FormControl>
-												<MentionTextarea
-													value={field.value || ""}
-													onChange={field.onChange}
-													variables={variables}
-													categories={categories}
-													placeholder="Goodbye from {server}!"
-													maxLength={100}
-													rows={1}
-													singleLine={false}
-													id="leave-embed-title-field"
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
+										<FormField
+											control={form.control}
+											name="embed_leave.title"
+											render={({ field }) => (
+												<FormItem>
+													<FormLabel>Title</FormLabel>
+													<FormControl>
+														<MentionTextarea
+															value={field.value || ""}
+															onChange={field.onChange}
+															variables={variables}
+															categories={categories}
+															placeholder="Goodbye from {server}!"
+															maxLength={100}
+															rows={1}
+															singleLine={false}
+															id="leave-embed-title-field"
+														/>
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
 
-								<FormField
-									control={form.control}
-									name="embed_leave.description"
-									render={({ field }) => (
-										<FormItem>
-											<FormLabel>Description</FormLabel>
-											<FormDescription>
-												The main content of your leave embed
-											</FormDescription>
-											<FormControl>
-												<MentionTextarea
-													value={field.value || ""}
-													onChange={field.onChange}
-													variables={variables}
-													categories={categories}
-													placeholder="We're sad to see you go!"
-													maxLength={500}
-													rows={4}
-													id="leave-embed-description-field"
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
+										<FormField
+											control={form.control}
+											name="embed_leave.description"
+											render={({ field }) => (
+												<FormItem>
+													<FormLabel>Description</FormLabel>
+													<FormControl>
+														<MentionTextarea
+															value={field.value || ""}
+															onChange={field.onChange}
+															variables={variables}
+															categories={categories}
+															placeholder="We're sad to see you go!"
+															maxLength={500}
+															rows={4}
+															id="leave-embed-description-field"
+														/>
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
 
-								<FormField
-									control={form.control}
-									name="embed_leave.thumbnail.url"
-									render={({ field }) => (
-										<FormItem>
-											<FormLabel>Thumbnail URL</FormLabel>
-											<FormDescription>
-												Enter the URL for the thumbnail image
-											</FormDescription>
-											<FormControl>
-												<MentionTextarea
-													value={field.value || ""}
-													onChange={field.onChange}
-													variables={variables}
-													categories={categories}
-													placeholder="Enter URL or use {server_image}, {bot_avatar}"
-													singleLine
-													id="leave-embed-thumbnail-field"
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
+										<EmbedFieldsEditor
+											name="embed_leave.fields"
+											label="Fields"
+											// description="Add fields to your leave embed"
+											id="leave-embed-fields"
+										/>
 
-								<FormField
-									control={form.control}
-									name="embed_leave.footer.text"
-									render={({ field }) => (
-										<FormItem>
-											<FormLabel>Footer</FormLabel>
-											<FormDescription>
-												Text that appears at the bottom of the leave embed
-											</FormDescription>
-											<FormControl>
-												<MentionTextarea
-													value={field.value || ""}
-													onChange={field.onChange}
-													variables={variables}
-													categories={categories}
-													placeholder="Come back soon!"
-													maxLength={100}
-													singleLine
-													id="leave-embed-footer-field"
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
+										<FormField
+											control={form.control}
+											name="embed_leave.image.url"
+											render={({ field }) => (
+												<FormItem>
+													<FormControl>
+														<ThumbnailSelector
+															value={field.value || ""}
+															onChange={field.onChange}
+															guildData={guildData || ({} as GuildData)}
+															userData={user}
+															label="Main Image"
+														/>
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
 
-								<EmbedFieldsEditor
-									name="embed_leave.fields"
-									label="Fields"
-									description="Add fields to your leave embed"
-									id="leave-embed-fields"
-								/>
+										<FormField
+											control={form.control}
+											name="embed_leave.footer.text"
+											render={({ field }) => (
+												<FormItem>
+													<FormLabel>Footer</FormLabel>
+													<FormControl>
+														<MentionTextarea
+															value={field.value || ""}
+															onChange={field.onChange}
+															variables={variables}
+															categories={categories}
+															placeholder="Come back soon!"
+															maxLength={100}
+															singleLine
+															id="leave-embed-footer-field"
+														/>
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
+									</div>
+									<div className="flex-shrink-0 w-20 self-start">
+										<FormField
+											control={form.control}
+											name="embed_leave.thumbnail.url"
+											render={({ field }) => (
+												<FormItem>
+													<FormControl>
+														<div className="h-20 w-20">
+															<ThumbnailSelector
+																value={field.value || ""}
+																onChange={field.onChange}
+																guildData={guildData || ({} as GuildData)}
+																userData={user}
+																label="Thumbnail"
+															/>
+														</div>
+													</FormControl>
+												</FormItem>
+											)}
+										/>
+									</div>
+								</div>
 							</div>
 
-							<div className="sticky top-4">
+							<div className="sticky top-4 space-y-4">
 								<EmbedPreview
 									embed={formValues.type === "embed" ? previewEmbed : null}
 									guildData={
