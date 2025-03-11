@@ -185,7 +185,8 @@ export function EmbedFieldsEditor({
 				{fields.map((field, index) => (
 					<div
 						key={field._id || index}
-						className="border rounded-md p-4 space-y-3"
+						className="border rounded-md p-4 space-y-3 relative"
+						style={{ zIndex: 5 }}
 					>
 						<div className="flex items-center justify-between">
 							<FormLabel>{`Field ${index + 1}`}</FormLabel>

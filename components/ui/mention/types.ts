@@ -51,7 +51,14 @@ export interface ParagraphElement {
 	children: Array<CustomText | MentionElement | MentionPlaceholderElement>;
 }
 
-export type CustomText = { text: string };
+export type CustomText = {
+	text: string;
+	bold?: boolean;
+	italic?: boolean;
+	underline?: boolean;
+	strikethrough?: boolean;
+	code?: boolean;
+};
 
 export type CustomElement =
 	| ParagraphElement

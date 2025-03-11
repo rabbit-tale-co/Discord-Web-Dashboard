@@ -99,17 +99,6 @@ export function MentionPopover({
 	// Reference to the command input
 	const commandInputRef = useRef<HTMLInputElement>(null);
 
-	// Debug logging
-	// console.log("MentionPopover props:", {
-	// 	mentionType,
-	// 	searchValue,
-	// 	variables: variables.length,
-	// 	categories: categories.length,
-	// 	roles: roles.length,
-	// 	channels: channels.length,
-	// 	editorId,
-	// });
-
 	// Filter roles and channels based on search value
 	const filteredRoles = roles.filter((role) =>
 		role.name.toLowerCase().includes(searchValue.toLowerCase()),
@@ -217,13 +206,6 @@ export function MentionPopover({
 	// Group variables by category
 	const groupedVariables = React.useMemo(() => {
 		const result: Record<string, Variable[]> = {};
-
-		// Debug logging
-		// console.log("Grouping variables:", {
-		// 	variables,
-		// 	categories,
-		// 	mentionType,
-		// });
 
 		// Initialize categories from the categories prop
 		for (const category of categories) {

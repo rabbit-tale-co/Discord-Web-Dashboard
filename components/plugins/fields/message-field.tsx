@@ -50,6 +50,9 @@ export function MessageField({
 }: MessageFieldProps) {
 	const form = useFormContext();
 
+	// Add a ref for the container to help with popover positioning
+	const containerRef = useRef<HTMLDivElement>(null);
+
 	// Generujemy unikalny identyfikator, jeśli nie został przekazany
 	const uniqueId = useMemo(
 		() => id || `mention-textarea-${name.replace(/\./g, "-")}`,
@@ -85,7 +88,7 @@ export function MessageField({
 					<FormItem>
 						{label && <FormLabel>{label}</FormLabel>}
 						<FormControl>
-							<div className="relative">
+							<div className="relative" ref={containerRef}>
 								<MentionTextarea
 									value={valueToUse}
 									onChange={(value) => {
@@ -103,6 +106,8 @@ export function MessageField({
 									variables={variables}
 									categories={categories}
 									id={uniqueId}
+									className="w-full" // Ensure full width
+									style={{ position: "relative", zIndex: 10 }} // Add z-index to ensure popover shows above other elements
 								/>
 							</div>
 						</FormControl>
