@@ -74,6 +74,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ImageIcon } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Define interfaces for our types
 interface EmbedField {
@@ -440,9 +441,6 @@ function ThumbnailSelector({
 				) : (
 					<div className="flex flex-col items-center justify-center text-gray-400">
 						<ImageIcon className={size === "large" ? "size-12" : "size-8"} />
-						{/* <span className="text-xs text-center mt-2">
-							{label || "Select image"}
-						</span> */}
 					</div>
 				)}
 			</div>
@@ -949,13 +947,30 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 				/>
 
 				<Tabs value={activeSection} onValueChange={setActiveSection}>
-					<TabsList className="grid w-full grid-cols-6">
-						<TabsTrigger value="welcome-message">Welcome Message</TabsTrigger>
-						<TabsTrigger value="leave-message">Leave Message</TabsTrigger>
-						<TabsTrigger value="welcome-embed">Welcome Embed</TabsTrigger>
-						<TabsTrigger value="leave-embed">Leave Embed</TabsTrigger>
-						<TabsTrigger value="channels">Channels</TabsTrigger>
-						<TabsTrigger value="roles">Roles</TabsTrigger>
+					<TabsList
+						className={cn(
+							"grid w-full",
+							"grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1",
+						)}
+					>
+						<TabsTrigger value="welcome-message" className="text-xs sm:text-sm">
+							Welcome
+						</TabsTrigger>
+						<TabsTrigger value="leave-message" className="text-xs sm:text-sm">
+							Leave
+						</TabsTrigger>
+						<TabsTrigger value="welcome-embed" className="text-xs sm:text-sm">
+							W. Embed
+						</TabsTrigger>
+						<TabsTrigger value="leave-embed" className="text-xs sm:text-sm">
+							L. Embed
+						</TabsTrigger>
+						<TabsTrigger value="channels" className="text-xs sm:text-sm">
+							Channels
+						</TabsTrigger>
+						<TabsTrigger value="roles" className="text-xs sm:text-sm">
+							Roles
+						</TabsTrigger>
 					</TabsList>
 
 					<TabsContent
@@ -995,7 +1010,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 						value="welcome-embed"
 						className="space-y-4 mt-4"
 					>
-						<div className="grid grid-cols-2 gap-6">
+						<div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
 							<div className="space-y-4">
 								<div className="flex gap-4">
 									<div className="flex-1 flex flex-col gap-4">
@@ -1086,7 +1101,6 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 															onChange={field.onChange}
 															guildData={guildData || ({} as GuildData)}
 															userData={user}
-															// label="Thumbnail"
 														/>
 													</FormControl>
 												</FormItem>
@@ -1096,32 +1110,75 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 								</div>
 							</div>
 
-							<div className="sticky top-4 space-y-4">
-								<EmbedPreview
-									embed={formValues.type === "embed" ? previewEmbed : null}
-									guildData={
-										{
-											id: guildData?.id || "",
-											name: guildData?.name || "",
-											icon: guildData?.guild_details?.icon || undefined,
-											roles: guildData?.roles || [],
-											channels: guildData?.channels || [],
-											guild_details: guildData?.guild_details || {},
-											category_count: 0,
-											text_channel_count: 0,
-											voice_channel_count: 0,
-											rolesCount: 0,
-											created_at: "",
-											features: [],
-											premium_tier: 0,
-											premium_subscription_count: 0,
-											nsfw_level: 0,
-											explicit_content_filter: 0,
-											system_channel_id: "",
-											system_channel_flags: 0,
-										} as unknown as GuildData
-									}
-								/>
+							<div className="space-y-4">
+								<div className="block 2xl:hidden">
+									<Dialog>
+										<DialogTrigger asChild>
+											<Button variant="outline" className="w-full">
+												Show Preview
+											</Button>
+										</DialogTrigger>
+										<DialogContent className="sm:max-w-3xl w-full">
+											<DialogHeader>
+												<DialogTitle>Embed Preview</DialogTitle>
+											</DialogHeader>
+											<EmbedPreview
+												embed={
+													formValues.type === "embed" ? previewEmbed : null
+												}
+												guildData={
+													{
+														id: guildData?.id || "",
+														name: guildData?.name || "",
+														icon: guildData?.guild_details?.icon || undefined,
+														roles: guildData?.roles || [],
+														channels: guildData?.channels || [],
+														guild_details: guildData?.guild_details || {},
+														category_count: 0,
+														text_channel_count: 0,
+														voice_channel_count: 0,
+														rolesCount: 0,
+														created_at: "",
+														features: [],
+														premium_tier: 0,
+														premium_subscription_count: 0,
+														nsfw_level: 0,
+														explicit_content_filter: 0,
+														system_channel_id: "",
+														system_channel_flags: 0,
+													} as unknown as GuildData
+												}
+											/>
+										</DialogContent>
+									</Dialog>
+								</div>
+								<div className="hidden 2xl:block sticky top-4">
+									<EmbedPreview
+										embed={formValues.type === "embed" ? previewEmbed : null}
+										guildData={
+											{
+												id: guildData?.id || "",
+												name: guildData?.name || "",
+												icon: guildData?.guild_details?.icon || undefined,
+												roles: guildData?.roles || [],
+												channels: guildData?.channels || [],
+												guild_details: guildData?.guild_details || {},
+												category_count: 0,
+												text_channel_count: 0,
+												voice_channel_count: 0,
+												rolesCount: 0,
+												created_at: "",
+												features: [],
+												premium_tier: 0,
+												premium_subscription_count: 0,
+												nsfw_level: 0,
+												explicit_content_filter: 0,
+												system_channel_id: "",
+												system_channel_flags: 0,
+											} as unknown as GuildData
+										}
+									/>
+								</div>
 							</div>
 						</div>
 					</TabsContent>
@@ -1202,7 +1259,6 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 										<EmbedFieldsEditor
 											name="embed_leave.fields"
 											label="Fields"
-											// description="Add fields to your leave embed"
 											id="leave-embed-fields"
 										/>
 
