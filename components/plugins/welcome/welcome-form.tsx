@@ -12,6 +12,9 @@ import * as z from "zod";
 import { toast } from "sonner";
 import { Colors } from "@/lib/constants/colors";
 import React from "react";
+import { cn } from "@/lib/utils";
+import { Server, Flag, User, Check, Upload } from "lucide-react";
+import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -46,7 +49,7 @@ import { EmbedFieldsEditor } from "../fields/embed-fields-editor";
 import { EmbedPreview } from "../fields/embed-preview";
 import { RoleField } from "../fields/role-field";
 import { ColorPicker } from "../fields/color-picker";
-import type { User } from "discord.js";
+import type { User as DiscordUser } from "discord.js";
 import { MessageField } from "../fields/message-field";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import {
@@ -70,8 +73,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ImageIcon, UploadIcon } from "lucide-react";
-import Image from "next/image";
+import { ImageIcon } from "lucide-react";
 
 // Define interfaces for our types
 interface EmbedField {
@@ -196,8 +198,9 @@ interface ThumbnailSelectorProps {
 	value: string;
 	onChange: (value: string) => void;
 	guildData: GuildData;
-	userData: User | null;
+	userData: DiscordUser | null;
 	label?: string;
+	size?: "small" | "large";
 }
 
 function ThumbnailSelector({
@@ -206,44 +209,45 @@ function ThumbnailSelector({
 	guildData,
 	userData,
 	label,
+	size = "small",
 }: ThumbnailSelectorProps) {
 	const [open, setOpen] = React.useState(false);
 	const isDesktop = useMediaQuery("(min-width: 768px)");
 	const [selectedOption, setSelectedOption] = React.useState<string>(
 		value || "",
 	);
+	const [tempSelected, setTempSelected] = React.useState<string>(value || "");
 	const [customUrl, setCustomUrl] = React.useState<string>(
 		value && !value.startsWith("{") ? value : "",
 	);
 	const [fileUpload, setFileUpload] = React.useState<File | null>(null);
 	const [previewUrl, setPreviewUrl] = React.useState<string>("");
 
-	// Predefined options
-	const options = [
+	// Predefined variables
+	const variables = [
+		{
+			id: "none",
+			label: "None",
+			description: "No image will be displayed",
+			icon: <ImageIcon className="size-4" />,
+		},
 		{
 			id: "{server_image}",
 			label: "Server Image",
 			description: "Use the server's icon",
+			icon: <Server className="size-4" />,
 		},
 		{
 			id: "{server_banner}",
 			label: "Server Banner",
 			description: "Use the server's banner",
+			icon: <Flag className="size-4" />,
 		},
 		{
 			id: "{avatar}",
-			label: "Bot Avatar",
-			description: "Use the bot's avatar",
-		},
-		{
-			id: "custom",
-			label: "Custom URL",
-			description: "Enter a custom image URL",
-		},
-		{
-			id: "upload",
-			label: "Upload Image",
-			description: "Upload your own image",
+			label: "User Avatar",
+			description: "Use the user's avatar",
+			icon: <User className="size-4" />,
 		},
 	];
 
@@ -254,165 +258,192 @@ function ThumbnailSelector({
 			setFileUpload(file);
 			const url = URL.createObjectURL(file);
 			setPreviewUrl(url);
-			setSelectedOption("upload");
+			setTempSelected("upload");
 		}
 	};
 
+	// Handle dialog open/close
+	const handleOpenChange = (open: boolean) => {
+		if (open) {
+			setTempSelected(selectedOption);
+		}
+		setOpen(open);
+	};
+
 	// Handle form submission
-	const handleSubmit = () => {
-		if (selectedOption === "custom" && customUrl) {
+	const handleConfirm = () => {
+		setSelectedOption(tempSelected);
+		if (tempSelected === "custom" && customUrl) {
 			onChange(customUrl);
-		} else if (selectedOption === "upload" && previewUrl) {
-			// In a real implementation, you would upload the file to a server
-			// and get back a URL. For now, we'll just use the preview URL.
+		} else if (tempSelected === "upload" && previewUrl) {
 			onChange(previewUrl);
-		} else if (selectedOption) {
-			onChange(selectedOption);
+		} else if (tempSelected === "none") {
+			onChange("");
+		} else if (tempSelected) {
+			onChange(tempSelected);
 		}
 		setOpen(false);
 	};
 
-	// Preview component for the thumbnail
+	// Preview component
 	const ThumbnailPreview = () => {
-		// Check if we have a valid URL or a variable
 		const hasValue = value && value.trim() !== "";
 		const isVariable = hasValue && value.startsWith("{");
 
-		// For variables, show a placeholder with the variable name
-		if (isVariable) {
-			let label = "Variable";
-			if (value === "{server_image}") label = "Server Image";
-			if (value === "{server_banner}") label = "Server Banner";
-			if (value === "{avatar}") label = "Bot Avatar";
-
-			return (
-				<div className="flex flex-col items-center justify-center rounded-md border-2 border-dashed border-gray-300 bg-gray-50 w-full text-center h-full">
-					<ImageIcon className="size-8 text-gray-400" />
-					{/* <span className="text-sm font-medium text-gray-500">{label}</span> */}
-				</div>
-			);
-		}
-
-		// For URLs, try to show the image
-		if (hasValue) {
-			return (
-				<div className="relative aspect-square w-full overflow-hidden rounded-md border border-gray-200 h-full">
-					<Image
-						src={value}
-						alt="Thumbnail"
-						fill
-						className="object-cover"
-						onError={(e) => {
-							// If image fails to load, show placeholder
-							e.currentTarget.style.display = "none";
-							e.currentTarget.nextElementSibling?.classList.remove("hidden");
-						}}
-					/>
-					<div className="hidden absolute inset-0 flex flex-col items-center justify-center bg-gray-50">
-						<ImageIcon className="mb-2 h-10 w-10 text-gray-400" />
-						<span className="text-sm font-medium text-gray-500">
-							Invalid image URL
+		return (
+			<div
+				className={cn(
+					"w-full border-2 border-dashed border-input rounded-md flex items-center justify-center cursor-pointer hover:border-gray-400 transition-colors bg-background",
+					size === "large" ? "h-[300px]" : "aspect-square",
+				)}
+			>
+				{hasValue ? (
+					<div className="w-full h-full flex items-center justify-center">
+						{isVariable ? (
+							<React.Fragment>
+								{value === "{server_image}" && (
+									<Server className={size === "large" ? "size-12" : "size-8"} />
+								)}
+								{value === "{server_banner}" && (
+									<Flag className={size === "large" ? "size-12" : "size-8"} />
+								)}
+								{value === "{avatar}" && (
+									<User className={size === "large" ? "size-12" : "size-8"} />
+								)}
+							</React.Fragment>
+						) : (
+							<div className="relative w-full h-full">
+								<Image
+									src={value}
+									alt="Selected image"
+									fill
+									className="object-cover rounded-md"
+									onError={(e) => {
+										e.currentTarget.style.display = "none";
+										e.currentTarget.nextElementSibling?.classList.remove(
+											"hidden",
+										);
+									}}
+								/>
+								<div className="hidden absolute inset-0 flex flex-col items-center justify-center">
+									<ImageIcon
+										className={size === "large" ? "h-12 w-12" : "h-8 w-8"}
+									/>
+									<span className="text-sm text-gray-400 mt-2">
+										Invalid image
+									</span>
+								</div>
+							</div>
+						)}
+					</div>
+				) : (
+					<div className="flex flex-col items-center justify-center text-gray-400">
+						<ImageIcon className={size === "large" ? "h-12 w-12" : "h-8 w-8"} />
+						<span className="text-xs text-center mt-2">
+							{label || "Select image"}
 						</span>
 					</div>
-				</div>
-			);
-		}
-
-		// Default placeholder
-		return (
-			<div className="flex flex-col items-center justify-center rounded-md border-2 border-dashed border-gray-300 bg-gray-50 p-4 text-center h-full">
-				<ImageIcon className="mb-2 h-10 w-10 text-gray-400" />
-				<span className="text-sm font-medium text-gray-500">
-					{label || "Select image"}
-				</span>
+				)}
 			</div>
 		);
 	};
 
-	// Content for both Dialog and Drawer
-	const ContentComponent = (
-		<div className="grid gap-4 py-4">
-			<RadioGroup
-				value={selectedOption}
-				onValueChange={setSelectedOption}
-				className="grid gap-3"
-			>
-				{options.map((option) => (
-					<div key={option.id} className="flex items-start space-x-3 space-y-0">
-						<RadioGroupItem value={option.id} id={option.id} />
-						<div className="grid gap-1.5 leading-none">
-							<Label htmlFor={option.id} className="font-medium">
-								{option.label}
-							</Label>
-							<p className="text-sm text-muted-foreground">
-								{option.description}
+	const dialogContent = (
+		<div className="space-y-4">
+			<Tabs defaultValue="variables" className="w-full">
+				<TabsList className="grid grid-cols-2 mb-4">
+					<TabsTrigger value="variables">Variables</TabsTrigger>
+					<TabsTrigger value="upload">Upload</TabsTrigger>
+				</TabsList>
+
+				<div className="h-[300px] relative">
+					<TabsContent
+						value="variables"
+						className="absolute inset-0 overflow-auto pr-2"
+					>
+						<div className="space-y-2">
+							{variables.map((variable) => (
+								<button
+									key={variable.id}
+									type="button"
+									onClick={() => setTempSelected(variable.id)}
+									className={cn(
+										"flex items-center w-full p-3 rounded-md border border-input transition-all",
+										tempSelected === variable.id
+											? "border-discord-bg bg-background"
+											: "bg-background hover:border-gray-500",
+									)}
+								>
+									<div className="flex items-center justify-center h-10 w-10 rounded-full bg-muted mr-3">
+										{variable.icon}
+									</div>
+									<div className="flex-1 text-left">
+										<div className="text-sm font-medium">{variable.label}</div>
+										<div className="text-xs text-gray-400">
+											{variable.description}
+										</div>
+									</div>
+									{tempSelected === variable.id && (
+										<div className="flex items-center justify-center size-5 rounded-full bg-discord-bg ml-2">
+											<Check className="size-3 text-white" />
+										</div>
+									)}
+								</button>
+							))}
+						</div>
+					</TabsContent>
+
+					<TabsContent value="upload" className="absolute inset-0">
+						<div className="flex flex-col items-center justify-center p-6 space-y-4">
+							<div className="w-24 h-24 rounded-md bg-muted flex items-center justify-center">
+								<Upload className="h-8 w-8 text-muted-foreground" />
+							</div>
+							<Input
+								id="image-upload"
+								type="file"
+								accept="image/*"
+								onChange={handleFileChange}
+								className="hidden"
+							/>
+							<Button
+								variant="outline"
+								onClick={() => document.getElementById("image-upload")?.click()}
+							>
+								Upload Image
+							</Button>
+							<p className="text-xs text-gray-400 text-center">
+								Upload an image from your device
 							</p>
 						</div>
-					</div>
-				))}
-			</RadioGroup>
-
-			{selectedOption === "custom" && (
-				<div className="grid gap-2">
-					<Label htmlFor="custom-url">Custom URL</Label>
-					<Input
-						id="custom-url"
-						value={customUrl}
-						onChange={(e) => setCustomUrl(e.target.value)}
-						placeholder="https://example.com/image.png"
-					/>
+					</TabsContent>
 				</div>
-			)}
 
-			{selectedOption === "upload" && (
-				<div className="grid gap-2">
-					<Label htmlFor="image-upload">Upload Image</Label>
-					<div className="grid gap-2">
-						<Input
-							id="image-upload"
-							type="file"
-							accept="image/*"
-							onChange={handleFileChange}
-						/>
-						{previewUrl && (
-							<div className="mt-2 aspect-square w-full max-w-[200px] overflow-hidden rounded-md border">
-								<Image
-									src={previewUrl}
-									alt="Preview"
-									width={200}
-									height={200}
-									className="h-full w-full object-cover"
-								/>
-							</div>
-						)}
-					</div>
+				<div className="mt-4 flex justify-end">
+					<Button variant="discord" onClick={handleConfirm}>
+						Save
+					</Button>
 				</div>
-			)}
-
-			<Button onClick={handleSubmit} className="mt-4">
-				Save
-			</Button>
+			</Tabs>
 		</div>
 	);
 
-	// Render Dialog on desktop, Drawer on mobile
 	if (isDesktop) {
 		return (
 			<div className="h-full">
-				<Dialog open={open} onOpenChange={setOpen}>
+				<Dialog open={open} onOpenChange={handleOpenChange}>
 					<DialogTrigger asChild>
-						<Button variant="ghost" className="size-25 mt-21 p-0 border-0">
+						<Button
+							variant="ghost"
+							className={`w-full p-0 border-0 ${size === "small" ? "mt-26" : "h-full"}`}
+						>
 							<ThumbnailPreview />
 						</Button>
 					</DialogTrigger>
 					<DialogContent className="sm:max-w-[425px]">
 						<DialogHeader>
 							<DialogTitle>Select Image</DialogTitle>
-							<DialogDescription>
-								Choose a predefined image or upload your own.
-							</DialogDescription>
 						</DialogHeader>
-						{ContentComponent}
+						{dialogContent}
 					</DialogContent>
 				</Dialog>
 			</div>
@@ -421,20 +452,17 @@ function ThumbnailSelector({
 
 	return (
 		<div className="h-full">
-			<Drawer open={open} onOpenChange={setOpen}>
+			<Drawer open={open} onOpenChange={handleOpenChange}>
 				<DrawerTrigger asChild>
-					<Button variant="outline" className="w-full h-full p-0 border-0">
+					<Button variant="ghost" className="w-full h-full p-0 border-0">
 						<ThumbnailPreview />
 					</Button>
 				</DrawerTrigger>
 				<DrawerContent>
 					<DrawerHeader className="text-left">
 						<DrawerTitle>Select Image</DrawerTitle>
-						<DrawerDescription>
-							Choose a predefined image or upload your own.
-						</DrawerDescription>
 					</DrawerHeader>
-					<div className="px-4">{ContentComponent}</div>
+					<div className="px-4">{dialogContent}</div>
 					<DrawerFooter className="pt-2">
 						<DrawerClose asChild>
 							<Button variant="outline">Cancel</Button>
@@ -478,7 +506,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 	);
 	const [isSaving, setIsSaving] = useState(false);
 	const [previewEmbed, setPreviewEmbed] = useState<EmbedData | null>(null);
-	const [user, setUser] = useState<User | null>(null);
+	const [user, setUser] = useState<DiscordUser | null>(null);
 
 	// Fetch user data on component mount
 	useEffect(() => {
@@ -841,7 +869,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 					>
 						<div className="grid grid-cols-2 gap-6">
 							<div className="space-y-4">
-								<div className="flex gap-4">
+								<div className="flex gap-4 pt-4">
 									<div className="flex-1 flex flex-col gap-4">
 										<FormField
 											control={form.control}
@@ -892,14 +920,15 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 											name="embed_welcome.image.url"
 											render={({ field }) => (
 												<FormItem>
+													<FormLabel className="text-sm">Image</FormLabel>
 													<FormControl>
-														{/* IMAGE SELECTOR */}
 														<ThumbnailSelector
 															value={field.value || ""}
 															onChange={field.onChange}
 															guildData={guildData || ({} as GuildData)}
 															userData={user}
 															label="Main Image"
+															size="large"
 														/>
 													</FormControl>
 													<FormMessage />
@@ -976,7 +1005,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 					>
 						<div className="grid grid-cols-2 gap-6">
 							<div className="space-y-4">
-								<div className="flex gap-4">
+								<div className="flex gap-4 pt-4">
 									<div className="flex-1">
 										<FormField
 											control={form.control}
@@ -1061,6 +1090,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 															guildData={guildData || ({} as GuildData)}
 															userData={user}
 															label="Main Image"
+															size="large"
 														/>
 													</FormControl>
 													<FormMessage />
@@ -1098,15 +1128,13 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 											render={({ field }) => (
 												<FormItem>
 													<FormControl>
-														<div className="h-20 w-20">
-															<ThumbnailSelector
-																value={field.value || ""}
-																onChange={field.onChange}
-																guildData={guildData || ({} as GuildData)}
-																userData={user}
-																label="Thumbnail"
-															/>
-														</div>
+														<ThumbnailSelector
+															value={field.value || ""}
+															onChange={field.onChange}
+															guildData={guildData || ({} as GuildData)}
+															userData={user}
+															label="Thumbnail"
+														/>
 													</FormControl>
 												</FormItem>
 											)}

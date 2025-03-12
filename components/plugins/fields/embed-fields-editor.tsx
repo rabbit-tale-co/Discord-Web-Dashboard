@@ -193,7 +193,7 @@ export function EmbedFieldsEditor({
 							<Button
 								type="button"
 								variant="ghost"
-								className="h-8 px-2"
+								size="iconSm"
 								onClick={() => removeField(index)}
 							>
 								<TrashIcon className="h-4 w-4" />

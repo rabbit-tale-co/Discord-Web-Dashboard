@@ -97,7 +97,7 @@ const TEXT_FORMATS = [
  * Component for rendering image placeholders
  */
 function ImagePlaceholder({ size = "large" }: { size?: "small" | "large" }) {
-	const dimensions = size === "small" ? "size-20" : "h-[300px] w-[400px]";
+	const dimensions = size === "small" ? "size-20" : "w-full h-[300px]";
 
 	const iconSize = size === "small" ? "size-8" : "h-12 w-12";
 
@@ -744,68 +744,24 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 			return html;
 		};
 
-		// Sprawdź, czy tekst zawiera proste znaczniki HTML
-		const hasSimpleHtml =
-			content.includes("<p>") ||
-			content.includes("</p>") ||
-			content.includes("<div>") ||
-			content.includes("</div>") ||
-			content.includes("<br>") ||
-			content.includes("<br/>") ||
-			content.includes("<span>") ||
-			content.includes("</span>");
-
-		// Sprawdź, czy tekst zawiera zaawansowane formatowanie
-		const hasAdvancedFormatting =
-			content.includes('data-mention-type="variable"') ||
-			content.includes("data-slate-node") ||
-			content.includes("mention") ||
-			content.includes("<strong>") ||
-			content.includes("<em>") ||
-			content.includes("<u>") ||
-			content.includes("<del>") ||
-			content.includes("<code>");
-
-		// Jeśli mamy proste HTML bez zaawansowanego formatowania, usuń znaczniki
-		let processableContent = content;
-		if (hasSimpleHtml && !hasAdvancedFormatting) {
-			processableContent = stripHtmlTags(content);
-			console.log(
-				"parseTitleContent: Stripped HTML tags from:",
-				content,
-				"to:",
-				processableContent,
-			);
-		}
-
-		// First, apply direct variable replacements
-		const processedContent = processVariables(processableContent, true);
-		console.log("parseTitleContent after processVariables:", processedContent);
-
-		// If the content includes variables in span format, we need to process them
-		if (content.includes('data-mention-type="variable"')) {
+		// Check if content contains variable mentions in span format
+		if (
+			content.includes('data-type="mention"') ||
+			content.includes('data-mention-type="variable"')
+		) {
 			try {
-				console.log(
-					"Content contains variable mentions, processing with DOMPurify",
-				);
-
 				// Configure DOMPurify for variable processing
 				const config = {
-					ALLOWED_TAGS: [
-						"span",
-						"div",
-						"p",
-						"br",
-						"b",
-						"i",
-						"u",
-						"strong",
-						"em",
-						"code",
-						"del",
+					ALLOWED_TAGS: ["span", "div", "p", "br"],
+					ALLOWED_ATTR: [
+						"class",
+						"data-type",
+						"data-value",
+						"data-mention-type",
+						"data-mention-value",
+						"contenteditable",
 					],
-					ALLOWED_ATTR: ["class", "data-mention-type", "data-mention-value"],
-					ADD_ATTR: ["data-mention-type", "data-mention-value"],
+					ADD_ATTR: ["data-mention-type", "data-value", "data-mention-value"],
 					ALLOW_DATA_ATTR: true,
 					RETURN_DOM: true,
 					RETURN_DOM_FRAGMENT: true,
@@ -816,71 +772,72 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 					content,
 					config,
 				) as unknown as DocumentFragment;
-				console.log("DOMPurify output:", fragment);
 
-				// Find all variable mentions in the sanitized content
-				const variableMentions = fragment.querySelectorAll(
-					'span[data-mention-type="variable"]',
-				);
-				console.log("Found variable mentions:", variableMentions.length);
+				// Process text nodes and variable mentions
+				const processNode = (node: Node): string => {
+					if (node.nodeType === Node.TEXT_NODE) {
+						return node.textContent || "";
+					}
 
-				// Replace each variable mention with its actual value
-				for (const mention of variableMentions) {
-					const variableName = mention.getAttribute("data-mention-value");
-					console.log("Processing variable in title:", variableName);
+					if (node.nodeType === Node.ELEMENT_NODE) {
+						const element = node as HTMLElement;
 
-					if (variableName) {
-						let value = variableName; // Default to the variable name
+						// Handle variable mentions
+						if (
+							element.tagName === "SPAN" &&
+							(element.getAttribute("data-type") === "mention" ||
+								element.getAttribute("data-mention-type") === "variable")
+						) {
+							const variableName =
+								element.getAttribute("data-value") ||
+								element.getAttribute("data-mention-value");
 
-						// Get the appropriate value based on variable type
-						switch (variableName) {
-							case "server_name":
-								value = guildData?.name || "Server";
-								break;
-							case "server_id":
-								value = guildData?.id || "Unknown";
-								break;
-							case "member_count":
-								value =
-									guildData?.guild_details?.approximate_member_count?.toString() ||
-									"0";
-								break;
-							case "user":
-							case "user.username":
-								value = userData?.username || "user";
-								console.log(
-									"User variable detected in title. userData:",
-									userData,
-								);
-								break;
+							if (variableName) {
+								switch (variableName) {
+									case "server_name":
+										return guildData?.name || "Server";
+									case "server_id":
+										return guildData?.id || "Unknown";
+									case "member_count":
+										return (
+											guildData?.guild_details?.approximate_member_count?.toString() ||
+											"0"
+										);
+									case "user":
+									case "user.username":
+										return userData?.username || "user";
+									default:
+										return variableName;
+								}
+							}
 						}
 
-						console.log(`Replacing ${variableName} with value:`, value);
-
-						// Replace the span with the text value
-						mention.textContent = value;
+						// Process child nodes
+						return Array.from(element.childNodes)
+							.map((child) => processNode(child))
+							.join("");
 					}
-				}
 
-				// Convert to plain text for the title
-				const plainText = fragment.textContent || "";
-				console.log("Final plain text for title:", plainText);
+					return "";
+				};
 
-				return [<span key="title-content">{plainText}</span>];
+				// Process the entire fragment
+				const processedText = Array.from(fragment.childNodes)
+					.map((node) => processNode(node))
+					.join("")
+					.trim();
+
+				console.log("Final processed title text:", processedText);
+				return [<span key="title-content">{processedText}</span>];
 			} catch (error) {
-				console.error("Error processing title mentions with DOMPurify:", error);
-				// Fallback - strip all HTML tags
-				const tempDiv = document.createElement("div");
-				tempDiv.innerHTML = content;
-				const plainText = tempDiv.textContent || tempDiv.innerText || "";
-				console.log("Error fallback plain text:", plainText);
-				return [<span key="title-content">{plainText}</span>];
+				console.error("Error processing title with variables:", error);
+				return [<span key="title-content">{stripHtmlTags(content)}</span>];
 			}
-		} else {
-			console.log("No variable mentions found in spans, using processed text");
-			// Use the already processed content
-			return [<span key="title-content">{processedContent}</span>];
 		}
+
+		// If no variable mentions, just process with normal variables
+		const processedContent = processVariables(content, true);
+		return [<span key="title-content">{processedContent}</span>];
 	};
 
 	// Process DOM nodes to extract mentions and format text
@@ -1112,6 +1069,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 					break;
 				case "server_name":
 					displayText = guildData?.name || "Server";
+					console.log("Variable server_name, guildData:", guildData?.name);
 					break;
 				case "server_id":
 					displayText = guildData?.id || "Unknown";
@@ -1136,7 +1094,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 					className="text-[#5865F2] bg-[#5865F21A] rounded px-1 mention"
 					data-mention-type="variable"
 					data-mention-value={id}
-					data-value={id}
+					data-value={displayText}
 				>
 					{displayText}
 				</span>
