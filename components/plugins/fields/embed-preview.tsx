@@ -155,7 +155,7 @@ function EmbedImage({
 
 	// Jeśli URL jest nieprawidłowy lub pusty, pokaż placeholder
 	if (!url || !isValidUrl(url)) {
-		console.log("Using placeholder for invalid URL:", url);
+		// console.log("Using placeholder for invalid URL:", url);
 		return <ImagePlaceholder size={size} />;
 	}
 
@@ -245,7 +245,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 				);
 				setChannels(nonCategoryChannels);
 			} else {
-				console.log("No cached data found or data is invalid");
+				console.warn("No cached data found or data is invalid");
 			}
 		} catch (err) {
 			console.error("Failed to load guild data from cache:", err);
@@ -269,7 +269,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 
 	// Helper function to format text with variables
 	const formatTextVariables = (text: string): string => {
-		console.log("[formatTextVariables] input:", text);
+		// console.log("[formatTextVariables] input:", text);
 
 		if (!text) return "";
 
@@ -311,22 +311,22 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 		let processableText = text;
 		if (hasSimpleHtml && !hasAdvancedFormatting) {
 			processableText = stripHtmlTags(text);
-			console.log(
-				"[formatTextVariables] Stripped HTML tags from:",
-				text,
-				"to:",
-				processableText,
-			);
+			// console.log(
+			// 	"[formatTextVariables] Stripped HTML tags from:",
+			// 	text,
+			// 	"to:",
+			// 	processableText,
+			// );
 		}
 
 		// Handle the special <id:customize> format for the Roles & Channels option
 		let processedText = processableText.replace(/<id:customize>/g, (match) => {
-			console.log("[formatTextVariables] Processing customize mention");
+			// console.log("[formatTextVariables] Processing customize mention");
 			const span = `<span class="mention customize-mention" data-mention-type="channel" data-mention-value="customize">Roles & Channels</span>`;
-			console.log(
-				"[formatTextVariables] Created customize mention span:",
-				span,
-			);
+			// console.log(
+			// 	"[formatTextVariables] Created customize mention span:",
+			// 	span,
+			// );
 			return span;
 		});
 
@@ -334,10 +334,10 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 		processedText = processedText.replace(
 			/<(#|@|@&)(\d+)>/g,
 			(match, type, id) => {
-				console.log("[formatTextVariables] Processing Discord-style mention:", {
-					type,
-					id,
-				});
+				// console.log("[formatTextVariables] Processing Discord-style mention:", {
+				// 	type,
+				// 	id,
+				// });
 
 				let mentionType = "unknown";
 				let displayText = id;
@@ -349,10 +349,10 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 						// Always use the latest channels data
 						const channel = channels.find((c) => c.id === id);
 						displayText = channel?.name || id;
-						console.log("[formatTextVariables] Channel mention:", {
-							id,
-							name: displayText,
-						});
+						// console.log("[formatTextVariables] Channel mention:", {
+						// 	id,
+						// 	name: displayText,
+						// });
 						break;
 					}
 					case "@": {
@@ -372,10 +372,10 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 
 				// Create appropriate mention span
 				const span = `<span class="mention" data-mention-type="${mentionType}" data-mention-value="${id}">${type === "#" ? "#" : "@"}${displayText}</span>`;
-				console.log(
-					"[formatTextVariables] Created Discord-style mention span:",
-					span,
-				);
+				// console.log(
+				// 	"[formatTextVariables] Created Discord-style mention span:",
+				// 	span,
+				// );
 				return span;
 			},
 		);
@@ -384,7 +384,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 		processedText = processedText.replace(
 			/\{([^{}]+)\}/g,
 			(match, variable) => {
-				console.log("[formatTextVariables] Processing variable:", variable);
+				// console.log("[formatTextVariables] Processing variable:", variable);
 
 				// Always get fresh values from latest state
 				let value = "";
@@ -392,57 +392,57 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 				switch (variable) {
 					case "server_name": {
 						value = guildData?.name || "Server";
-						console.log(
-							"[formatTextVariables] server_name value:",
-							value,
-							"guildData:",
-							guildData?.name,
-						);
+						// console.log(
+						// 	"[formatTextVariables] server_name value:",
+						// 	value,
+						// 	"guildData:",
+						// 	guildData?.name,
+						// );
 						break;
 					}
 					case "server_id": {
 						value = guildData?.id || "Unknown";
-						console.log("[formatTextVariables] server_id value:", value);
+						// console.log("[formatTextVariables] server_id value:", value);
 						break;
 					}
 					case "member_count": {
 						value =
 							guildData?.guild_details?.approximate_member_count?.toString() ||
 							"0";
-						console.log("[formatTextVariables] member_count value:", value);
+						// console.log("[formatTextVariables] member_count value:", value);
 						break;
 					}
 					case "user":
 					case "user.username": {
 						value = userData?.username || "user";
-						console.log(
-							"[formatTextVariables] user variable. userData:",
-							userData,
-							"value:",
-							value,
-						);
+						// console.log(
+						// 	"[formatTextVariables] user variable. userData:",
+						// 	userData,
+						// 	"value:",
+						// 	value,
+						// );
 						break;
 					}
 					default: {
 						value = variable;
-						console.log(
-							"[formatTextVariables] default variable:",
-							variable,
-							"value:",
-							value,
-						);
+						// console.log(
+						// 	"[formatTextVariables] default variable:",
+						// 	variable,
+						// 	"value:",
+						// 	value,
+						// );
 						break;
 					}
 				}
 
 				// Ensure we have a properly formatted mention span with correct attributes
 				const span = `<span class="mention" data-mention-type="variable" data-mention-value="${variable}">${value}</span>`;
-				console.log("[formatTextVariables] Created mention span:", span);
+				// console.log("[formatTextVariables] Created mention span:", span);
 				return span;
 			},
 		);
 
-		console.log("[formatTextVariables] result:", processedText);
+		// console.log("[formatTextVariables] result:", processedText);
 		return processedText;
 	};
 
@@ -451,7 +451,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 		(text: string, isTitle = false): string => {
 			if (!text) return "";
 
-			console.log("[processVariables] input:", text, "isTitle:", isTitle);
+			//console.log("[processVariables] input:", text, "isTitle:", isTitle);
 
 			// Funkcja do usuwania znaczników HTML
 			const stripHtmlTags = (html: string): string => {
@@ -491,19 +491,19 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 			let processableText = text;
 			if (hasSimpleHtml && !hasAdvancedFormatting) {
 				processableText = stripHtmlTags(text);
-				console.log(
-					"[processVariables] Stripped HTML tags from:",
-					text,
-					"to:",
-					processableText,
-				);
+				// console.log(
+				// 	"[processVariables] Stripped HTML tags from:",
+				// 	text,
+				// 	"to:",
+				// 	processableText,
+				// );
 			}
 
 			// First, handle direct variable replacements for display in the preview
 			const processedText = processableText.replace(
 				/\{([^{}]+)\}/g,
 				(match, variable) => {
-					console.log("[processVariables] Processing variable:", variable);
+					// console.log("[processVariables] Processing variable:", variable);
 
 					// Always get fresh values from latest state
 					let value = "";
@@ -511,45 +511,45 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 					switch (variable) {
 						case "server_name": {
 							value = guildData?.name || "Server";
-							console.log(
-								"[processVariables] server_name value:",
-								value,
-								"guildData:",
-								guildData?.name,
-							);
+							// console.log(
+							// 	"[processVariables] server_name value:",
+							// 	value,
+							// 	"guildData:",
+							// 	guildData?.name,
+							// );
 							break;
 						}
 						case "server_id": {
 							value = guildData?.id || "Unknown";
-							console.log("[processVariables] server_id value:", value);
+							// console.log("[processVariables] server_id value:", value);
 							break;
 						}
 						case "member_count": {
 							value =
 								guildData?.guild_details?.approximate_member_count?.toString() ||
 								"0";
-							console.log("[processVariables] member_count value:", value);
+							// console.log("[processVariables] member_count value:", value);
 							break;
 						}
 						case "user":
 						case "user.username": {
 							value = userData?.username || "user";
-							console.log(
-								"[processVariables] user variable. userData:",
-								userData,
-								"value:",
-								value,
-							);
+							// console.log(
+							// 	"[processVariables] user variable. userData:",
+							// 	userData,
+							// 	"value:",
+							// 	value,
+							// );
 							break;
 						}
 						default: {
 							value = match;
-							console.log(
-								"[processVariables] default variable:",
-								variable,
-								"value:",
-								value,
-							);
+							// console.log(
+							// 	"[processVariables] default variable:",
+							// 	variable,
+							// 	"value:",
+							// 	value,
+							// );
 							break;
 						}
 					}
@@ -563,10 +563,10 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 				},
 			);
 
-			console.log(
-				"[processVariables] after variable replacement:",
-				processedText,
-			);
+			// console.log(
+			// 	"[processVariables] after variable replacement:",
+			// 	processedText,
+			// );
 
 			return processedText;
 		},
@@ -739,7 +739,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 	const parseTitleContent = (content: string): ReactElement[] => {
 		if (!content) return [];
 
-		console.log("parseTitleContent input:", content);
+		//console.log("parseTitleContent input:", content);
 
 		// Funkcja do usuwania znaczników HTML
 		const stripHtmlTags = (html: string): string => {
@@ -836,7 +836,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 					.join("")
 					.trim();
 
-				console.log("Final processed title text:", processedText);
+				//console.log("Final processed title text:", processedText);
 				return [<span key="title-content">{processedText}</span>];
 			} catch (error) {
 				console.error("Error processing title with variables:", error);
@@ -1022,23 +1022,23 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 
 	// Helper function to render a mention based on type and ID
 	const renderMention = (type: string, id: string): ReactElement | null => {
-		console.log(
-			"renderMention called with type:",
-			type,
-			"id:",
-			id || "<empty string>",
-		);
+		// console.log(
+		// 	"renderMention called with type:",
+		// 	type,
+		// 	"id:",
+		// 	id || "<empty string>",
+		// );
 
 		// Skip rendering if type or id is empty
 		if (!type || !id) {
-			console.log("Skipping mention rendering due to empty type or id");
+			//console.log("Skipping mention rendering due to empty type or id");
 			return null;
 		}
 
 		if (type === "channel") {
 			// Special case for "customize" which is the Roles & Channels option
 			if (id === "customize") {
-				console.log("Rendering customize mention");
+				//console.log("Rendering customize mention");
 				return (
 					<span
 						key="channel-customize"
@@ -1052,7 +1052,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 			}
 
 			const channel = channels.find((c) => c.id === id);
-			console.log("Rendering channel mention, found channel:", channel?.name);
+			// console.log("Rendering channel mention, found channel:", channel?.name);
 			return (
 				<span
 					key={`channel-${id}`}
@@ -1074,11 +1074,11 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 				case "user.username":
 				case "user":
 					displayText = userData?.username || "user";
-					console.log("Variable user/user.username, userData:", userData);
+					// console.log("Variable user/user.username, userData:", userData);
 					break;
 				case "server_name":
 					displayText = guildData?.name || "Server";
-					console.log("Variable server_name, guildData:", guildData?.name);
+					// console.log("Variable server_name, guildData:", guildData?.name);
 					break;
 				case "server_id":
 					displayText = guildData?.id || "Unknown";
@@ -1090,12 +1090,12 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 					break;
 			}
 
-			console.log(
-				"Rendering variable mention:",
-				id,
-				"with display text:",
-				displayText,
-			);
+			// console.log(
+			// 	"Rendering variable mention:",
+			// 	id,
+			// 	"with display text:",
+			// 	displayText,
+			// );
 
 			return (
 				<span
@@ -1147,19 +1147,19 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 		};
 
 		// Process embed values when present
-		console.log("Processing embed values, original embed:", embed);
-		console.log("Current userData:", userData, "guildData:", guildData?.name);
-		console.log("Changes detected:", {
-			hasEmbedChanged,
-			hasUserDataChanged,
-			hasGuildDataChanged,
-			hasChannelsChanged,
-			hasRolesChanged,
-		});
+		// console.log("Processing embed values, original embed:", embed);
+		// console.log("Current userData:", userData, "guildData:", guildData?.name);
+		// console.log("Changes detected:", {
+		// 	hasEmbedChanged,
+		// 	hasUserDataChanged,
+		// 	hasGuildDataChanged,
+		// 	hasChannelsChanged,
+		// 	hasRolesChanged,
+		// });
 
 		try {
 			// Process embed values with variables
-			console.log("Processing embed in useEffect. Original embed:", embed);
+			// console.log("Processing embed in useEffect. Original embed:", embed);
 
 			const processedData = {
 				...embed,
@@ -1181,7 +1181,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 					: undefined,
 			};
 
-			console.log("Processed embed data:", processedData);
+			// console.log("Processed embed data:", processedData);
 
 			// Force refresh by creating a new object reference
 			setProcessedEmbed({ ...processedData });
@@ -1235,12 +1235,12 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 			let processableContent = content;
 			if (hasSimpleHtml && !hasAdvancedFormatting) {
 				processableContent = stripHtmlTags(content);
-				console.log(
-					"Stripped HTML tags from content:",
-					content,
-					"to:",
-					processableContent,
-				);
+				// console.log(
+				// 	"Stripped HTML tags from content:",
+				// 	content,
+				// 	"to:",
+				// 	processableContent,
+				// );
 			}
 
 			// Napraw potencjalnie uszkodzone tagi span
@@ -1327,18 +1327,18 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 	const resolveImageUrl = (url: string): string | undefined => {
 		if (!url) return undefined;
 
-		console.log("Resolving image URL:", url);
+		// console.log("Resolving image URL:", url);
 
 		// Handle data URLs
 		if (url.startsWith("data:image/")) {
-			console.log("Returning data URL as is");
+			// console.log("Returning data URL as is");
 			return url;
 		}
 
 		// Handle special variables
 		if (url.startsWith("{") && url.endsWith("}")) {
 			const variable = url.slice(1, -1);
-			console.log("Handling image variable:", variable);
+			// console.log("Handling image variable:", variable);
 			switch (variable) {
 				case "server_image": {
 					if (!guildData?.guild_details?.icon) {
@@ -1375,7 +1375,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 
 		// Handle direct URLs (including http, https, and blob URLs)
 		if (url.startsWith("http") || url.startsWith("blob:")) {
-			console.log("Returning direct URL:", url);
+			// console.log("Returning direct URL:", url);
 			return url;
 		}
 
@@ -1386,7 +1386,7 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 
 		// If none of the above conditions match, return the URL as is
 		// This will handle any other valid URL formats
-		console.log("Returning URL as is:", url);
+		//console.log("Returning URL as is:", url);
 		return url;
 	};
 

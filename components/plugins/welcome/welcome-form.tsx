@@ -839,19 +839,8 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 		try {
 			const bot_id = process.env.NEXT_PUBLIC_BOT_ID;
 			if (!bot_id) {
-				throw new Error("Bot ID not configured");
+				throw new Error("Bot ID not found in environment variables");
 			}
-
-			const configData = {
-				...values,
-				welcome_message: values.welcome_message,
-				welcome_channel_id: values.welcome_channel_id,
-				leave_message: values.leave_message,
-				leave_channel_id: values.leave_channel_id,
-				join_role_id: values.join_role_id,
-				embed_welcome: values.embed_welcome,
-				embed_leave: values.embed_leave,
-			};
 
 			const response = await fetch("/api/plugins/set", {
 				method: "POST",
@@ -861,32 +850,84 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 				body: JSON.stringify({
 					bot_id,
 					guild_id: guildId,
-					plugin_id: "welcome_goodbye",
-					plugin_name: "Welcome & Goodbye",
-					config: configData,
+					plugin_name: "welcome_goodbye",
+					config: {
+						type: values.type,
+						enabled: values.enabled,
+						embed_leave: {
+							color: values.embed_leave?.color,
+							title: values.embed_leave?.title,
+							footer: values.embed_leave?.footer?.text
+								? {
+										text: values.embed_leave.footer.text,
+									}
+								: undefined,
+							description: values.embed_leave?.description,
+							...(values.embed_leave?.thumbnail?.url
+								? { thumbnail: { url: values.embed_leave.thumbnail.url } }
+								: {}),
+							...(values.embed_leave?.image?.url
+								? { image: { url: values.embed_leave.image.url } }
+								: {}),
+							...(values.embed_leave?.fields?.length
+								? {
+										fields: values.embed_leave.fields.filter(
+											(f) => f.name && f.value,
+										),
+									}
+								: {}),
+						},
+						join_role_id: values.join_role_id,
+						embed_welcome: {
+							color: values.embed_welcome?.color,
+							title: values.embed_welcome?.title,
+							footer: values.embed_welcome?.footer?.text
+								? {
+										text: values.embed_welcome.footer.text,
+									}
+								: undefined,
+							description: values.embed_welcome?.description,
+							...(values.embed_welcome?.thumbnail?.url
+								? { thumbnail: { url: values.embed_welcome.thumbnail.url } }
+								: {}),
+							...(values.embed_welcome?.image?.url
+								? { image: { url: values.embed_welcome.image.url } }
+								: {}),
+							...(values.embed_welcome?.fields?.length
+								? {
+										fields: values.embed_welcome.fields.filter(
+											(f) => f.name && f.value,
+										),
+									}
+								: {}),
+						},
+						leave_message: values.leave_message,
+						welcome_message: values.welcome_message,
+						leave_channel_id: values.leave_channel_id,
+						welcome_channel_id: values.welcome_channel_id,
+					},
 				}),
 			});
 
 			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new Error(errorData.message || "Failed to save configuration");
+				const error = await response.json();
+				throw new Error(
+					error.message || "Failed to update welcome configuration",
+				);
 			}
 
-			form.reset(values);
-
-			toast.success("Configuration saved", {
-				description: "The plugin configuration has been updated successfully.",
-			});
-
-			// Refresh plugin data
 			await refetchPlugins();
+
+			toast.success("Welcome configuration updated", {
+				description: "Your changes have been saved successfully.",
+			});
 		} catch (error) {
-			console.error("Error saving config:", error);
-			toast.error("Failed to save configuration", {
+			console.error("Error updating welcome config:", error);
+			toast.error("Failed to save changes", {
 				description:
 					error instanceof Error
 						? error.message
-						: "Please try again later or contact support.",
+						: "An unexpected error occurred. Please try again.",
 			});
 		} finally {
 			setIsSaving(false);

@@ -65,8 +65,6 @@ function processConfig<T>(config: T): T {
 // POST endpoint for setting plugin configurations directly
 export async function POST(request: Request) {
 	try {
-		console.log("POST /api/plugins/set - Request received");
-
 		if (!process.env.NEXT_PUBLIC_BACKEND_URL) {
 			throw new Error("Backend URL not configured");
 		}
@@ -75,12 +73,12 @@ export async function POST(request: Request) {
 		const body = await request.json();
 		const { bot_id, guild_id, plugin_name, config } = body;
 
-		console.log("Request body:", {
-			bot_id: bot_id ? "[PROVIDED]" : "[MISSING]",
-			guild_id,
-			plugin_name,
-			config: config ? "[DATA]" : "[MISSING]",
-		});
+		// console.log("Request body:", {
+		// 	bot_id: bot_id ? "[PROVIDED]" : "[MISSING]",
+		// 	guild_id,
+		// 	plugin_name,
+		// 	config: config ? "[DATA]" : "[MISSING]",
+		// });
 
 		// Validate required fields
 		if (!guild_id || !plugin_name) {
@@ -126,13 +124,13 @@ export async function POST(request: Request) {
 						field
 					] as string;
 					if (original !== processed) {
-						console.log(`Field '${field}' was processed:`, {
-							original:
-								original.substring(0, 50) + (original.length > 50 ? "..." : ""),
-							processed:
-								processed.substring(0, 50) +
-								(processed.length > 50 ? "..." : ""),
-						});
+						// console.log(`Field '${field}' was processed:`, {
+						// 	original:
+						// 		original.substring(0, 50) + (original.length > 50 ? "..." : ""),
+						// 	processed:
+						// 		processed.substring(0, 50) +
+						// 		(processed.length > 50 ? "..." : ""),
+						// });
 					}
 				}
 			}
@@ -165,11 +163,11 @@ export async function POST(request: Request) {
 				}),
 			});
 
-			console.log(
-				"Discord API response status:",
-				response.status,
-				response.statusText,
-			);
+			// console.log(
+			// 	"Discord API response status:",
+			// 	response.status,
+			// 	response.statusText,
+			// );
 
 			if (!response.ok) {
 				const errorText = await response.text();
@@ -226,7 +224,7 @@ export async function POST(request: Request) {
 			}
 
 			const data = await response.json();
-			console.log("Plugin configuration set successfully");
+			// console.log("Plugin configuration set successfully");
 			return NextResponse.json(data);
 		} catch (fetchError: unknown) {
 			console.error("Fetch error when calling Discord API:", fetchError);
