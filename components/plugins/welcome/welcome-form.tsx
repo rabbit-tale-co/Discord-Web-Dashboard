@@ -256,9 +256,14 @@ function ThumbnailSelector({
 		const file = e.target.files?.[0];
 		if (file) {
 			setFileUpload(file);
-			const url = URL.createObjectURL(file);
-			setPreviewUrl(url);
-			setTempSelected("upload");
+			// Create a data URL for the file
+			const reader = new FileReader();
+			reader.onload = (e) => {
+				const dataUrl = e.target?.result as string;
+				setPreviewUrl(dataUrl);
+				setTempSelected("upload");
+			};
+			reader.readAsDataURL(file);
 		}
 	};
 
@@ -290,6 +295,37 @@ function ThumbnailSelector({
 		const hasValue = value && value.trim() !== "";
 		const isVariable = hasValue && value.startsWith("{");
 
+		const getVariableImageUrl = () => {
+			if (!isVariable) return null;
+
+			switch (value) {
+				case "{server_image}": {
+					if (!guildData?.guild_details?.icon) return null;
+					return avatarUrl(
+						guildData.id,
+						guildData.guild_details.icon,
+						1024,
+						false,
+					);
+				}
+				case "{avatar}": {
+					if (!userData?.id || !userData?.avatar) return null;
+					return avatarUrl(userData.id, userData.avatar, 1024, true);
+				}
+				case "{server_banner}": {
+					if (!guildData?.guild_details?.banner) return null;
+					return avatarUrl(
+						guildData.id,
+						guildData.guild_details.banner,
+						1024,
+						false,
+					);
+				}
+				default:
+					return null;
+			}
+		};
+
 		return (
 			<div
 				className={cn(
@@ -301,15 +337,80 @@ function ThumbnailSelector({
 					<div className="w-full h-full flex items-center justify-center">
 						{isVariable ? (
 							<React.Fragment>
-								{value === "{server_image}" && (
-									<Server className={size === "large" ? "size-12" : "size-8"} />
-								)}
-								{value === "{server_banner}" && (
-									<Flag className={size === "large" ? "size-12" : "size-8"} />
-								)}
-								{value === "{avatar}" && (
-									<User className={size === "large" ? "size-12" : "size-8"} />
-								)}
+								{value === "{server_image}" &&
+									(guildData?.guild_details?.icon ? (
+										<div className="relative w-full h-full">
+											<Image
+												src={getVariableImageUrl() || ""}
+												alt="Server icon"
+												fill
+												className="object-cover rounded-md"
+												onError={(e) => {
+													e.currentTarget.style.display = "none";
+													e.currentTarget.nextElementSibling?.classList.remove(
+														"hidden",
+													);
+												}}
+											/>
+											<div className="hidden absolute inset-0 flex items-center justify-center">
+												<Server
+													className={size === "large" ? "size-12" : "size-8"}
+												/>
+											</div>
+										</div>
+									) : (
+										<Server
+											className={size === "large" ? "size-12" : "size-8"}
+										/>
+									))}
+								{value === "{server_banner}" &&
+									(guildData?.guild_details?.banner ? (
+										<div className="relative w-full h-full">
+											<Image
+												src={getVariableImageUrl() || ""}
+												alt="Server banner"
+												fill
+												className="object-cover rounded-md"
+												onError={(e) => {
+													e.currentTarget.style.display = "none";
+													e.currentTarget.nextElementSibling?.classList.remove(
+														"hidden",
+													);
+												}}
+											/>
+											<div className="hidden absolute inset-0 flex items-center justify-center">
+												<Flag
+													className={size === "large" ? "size-12" : "size-8"}
+												/>
+											</div>
+										</div>
+									) : (
+										<Flag className={size === "large" ? "size-12" : "size-8"} />
+									))}
+								{value === "{avatar}" &&
+									(userData?.avatar ? (
+										<div className="relative w-full h-full">
+											<Image
+												src={getVariableImageUrl() || ""}
+												alt="User avatar"
+												fill
+												className="object-cover rounded-md"
+												onError={(e) => {
+													e.currentTarget.style.display = "none";
+													e.currentTarget.nextElementSibling?.classList.remove(
+														"hidden",
+													);
+												}}
+											/>
+											<div className="hidden absolute inset-0 flex items-center justify-center">
+												<User
+													className={size === "large" ? "size-12" : "size-8"}
+												/>
+											</div>
+										</div>
+									) : (
+										<User className={size === "large" ? "size-12" : "size-8"} />
+									))}
 							</React.Fragment>
 						) : (
 							<div className="relative w-full h-full">
@@ -338,10 +439,10 @@ function ThumbnailSelector({
 					</div>
 				) : (
 					<div className="flex flex-col items-center justify-center text-gray-400">
-						<ImageIcon className={size === "large" ? "h-12 w-12" : "h-8 w-8"} />
-						<span className="text-xs text-center mt-2">
+						<ImageIcon className={size === "large" ? "size-12" : "size-8"} />
+						{/* <span className="text-xs text-center mt-2">
 							{label || "Select image"}
-						</span>
+						</span> */}
 					</div>
 				)}
 			</div>
@@ -395,8 +496,33 @@ function ThumbnailSelector({
 
 					<TabsContent value="upload" className="absolute inset-0">
 						<div className="flex flex-col items-center justify-center p-6 space-y-4">
-							<div className="w-24 h-24 rounded-md bg-muted flex items-center justify-center">
-								<Upload className="h-8 w-8 text-muted-foreground" />
+							<div className="w-full h-48 rounded-md bg-muted flex items-center justify-center relative">
+								{previewUrl ? (
+									<div className="relative w-full h-full">
+										<Image
+											src={previewUrl}
+											alt="Selected image"
+											fill
+											className="object-cover rounded-md"
+											onError={(e) => {
+												e.currentTarget.style.display = "none";
+												e.currentTarget.nextElementSibling?.classList.remove(
+													"hidden",
+												);
+											}}
+										/>
+										<div className="hidden absolute inset-0 flex flex-col items-center justify-center">
+											<ImageIcon className="h-8 w-8" />
+											<span className="text-sm text-gray-400 mt-2">
+												Invalid image
+											</span>
+										</div>
+									</div>
+								) : (
+									<>
+										<Upload className="h-8 w-8 text-muted-foreground" />
+									</>
+								)}
 							</div>
 							<Input
 								id="image-upload"
@@ -409,10 +535,12 @@ function ThumbnailSelector({
 								variant="outline"
 								onClick={() => document.getElementById("image-upload")?.click()}
 							>
-								Upload Image
+								{previewUrl ? "Change Image" : "Upload Image"}
 							</Button>
 							<p className="text-xs text-gray-400 text-center">
-								Upload an image from your device
+								{previewUrl
+									? "Click to change the image"
+									: "Upload an image from your device"}
 							</p>
 						</div>
 					</TabsContent>
@@ -833,7 +961,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 					<TabsContent
 						key="welcome-message-tab"
 						value="welcome-message"
-						className="space-y-4"
+						className="space-y-4 mt-4"
 					>
 						<MessageField
 							name="welcome_message"
@@ -849,7 +977,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 					<TabsContent
 						key="leave-message-tab"
 						value="leave-message"
-						className="space-y-4"
+						className="space-y-4 mt-4"
 					>
 						<MessageField
 							name="leave_message"
@@ -865,11 +993,11 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 					<TabsContent
 						key="welcome-embed-tab"
 						value="welcome-embed"
-						className="space-y-4"
+						className="space-y-4 mt-4"
 					>
 						<div className="grid grid-cols-2 gap-6">
 							<div className="space-y-4">
-								<div className="flex gap-4 pt-4">
+								<div className="flex gap-4">
 									<div className="flex-1 flex flex-col gap-4">
 										<FormField
 											control={form.control}
@@ -958,7 +1086,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 															onChange={field.onChange}
 															guildData={guildData || ({} as GuildData)}
 															userData={user}
-															label="Thumbnail"
+															// label="Thumbnail"
 														/>
 													</FormControl>
 												</FormItem>
@@ -1001,12 +1129,12 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 					<TabsContent
 						key="leave-embed-tab"
 						value="leave-embed"
-						className="space-y-4"
+						className="space-y-4 mt-4"
 					>
 						<div className="grid grid-cols-2 gap-6">
 							<div className="space-y-4">
-								<div className="flex gap-4 pt-4">
-									<div className="flex-1">
+								<div className="flex gap-4">
+									<div className="flex-1 flex flex-col gap-4">
 										<FormField
 											control={form.control}
 											name="embed_leave.color"
@@ -1083,6 +1211,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 											name="embed_leave.image.url"
 											render={({ field }) => (
 												<FormItem>
+													<FormLabel className="text-sm">Image</FormLabel>
 													<FormControl>
 														<ThumbnailSelector
 															value={field.value || ""}
@@ -1177,7 +1306,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 					<TabsContent
 						key="channels-tab"
 						value="channels"
-						className="space-y-4"
+						className="space-y-4 mt-4"
 					>
 						<div className="grid grid-cols-2 gap-6">
 							<ChannelField
@@ -1196,7 +1325,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 						</div>
 					</TabsContent>
 
-					<TabsContent key="roles-tab" value="roles" className="space-y-4">
+					<TabsContent key="roles-tab" value="roles" className="space-y-4 mt-4">
 						<div className="grid grid-cols-2 gap-6">
 							<RoleField
 								name="join_role_id"

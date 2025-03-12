@@ -25,6 +25,7 @@ interface GuildDetails {
 	id: string;
 	name: string;
 	icon: string | null;
+	banner: string | null;
 	features: GuildFeature[];
 	owner_id: string;
 	approximate_member_count: number;

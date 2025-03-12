@@ -131,6 +131,11 @@ function EmbedImage({
 				return false;
 			}
 
+			// Akceptuj data URL
+			if (urlString.startsWith("data:image/")) {
+				return true;
+			}
+
 			// Sprawdź, czy URL zaczyna się od http lub https
 			if (
 				!urlString.startsWith("http://") &&
@@ -161,6 +166,9 @@ function EmbedImage({
 			? "size-20 rounded-md object-cover"
 			: "max-h-[300px] w-auto rounded-md object-cover";
 
+	// Dla data URL używamy unoptymalizowanego obrazu
+	const unoptimized = url.startsWith("data:image/");
+
 	return (
 		<Image
 			src={url}
@@ -168,6 +176,7 @@ function EmbedImage({
 			width={width}
 			height={height}
 			className={className}
+			unoptimized={unoptimized}
 		/>
 	);
 }
@@ -1320,6 +1329,12 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 
 		console.log("Resolving image URL:", url);
 
+		// Handle data URLs
+		if (url.startsWith("data:image/")) {
+			console.log("Returning data URL as is");
+			return url;
+		}
+
 		// Handle special variables
 		if (url.startsWith("{") && url.endsWith("}")) {
 			const variable = url.slice(1, -1);
@@ -1358,8 +1373,9 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 			}
 		}
 
-		// Handle direct URLs
-		if (url.startsWith("http")) {
+		// Handle direct URLs (including http, https, and blob URLs)
+		if (url.startsWith("http") || url.startsWith("blob:")) {
+			console.log("Returning direct URL:", url);
 			return url;
 		}
 
@@ -1368,7 +1384,10 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 			return avatarUrl(userData.id, url, 1024, true);
 		}
 
-		return undefined;
+		// If none of the above conditions match, return the URL as is
+		// This will handle any other valid URL formats
+		console.log("Returning URL as is:", url);
+		return url;
 	};
 
 	if (!processedEmbed) return null;
@@ -1493,9 +1512,11 @@ export function EmbedPreview({ embed, guildData }: EmbedPreviewProps) {
 											)}
 
 										{/* Main Image */}
-										<div className="flex-shrink-0 mb-3">
-											<EmbedImage url={imageUrl} alt="Embed Image" />
-										</div>
+										{imageUrl && (
+											<div className="flex-shrink-0 mb-3">
+												<EmbedImage url={imageUrl} alt="Embed Image" />
+											</div>
+										)}
 
 										{/* Footer */}
 										{processedEmbed.footer?.text && (

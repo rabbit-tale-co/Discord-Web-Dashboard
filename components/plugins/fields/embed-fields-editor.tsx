@@ -7,6 +7,7 @@ import { FormField } from "@/components/ui/form";
 import { ArrayField } from "./array-field";
 import type { GuildData } from "@/types/guild";
 import React from "react";
+import { toast } from "sonner";
 
 import {
 	FormControl,
@@ -17,51 +18,7 @@ import {
 } from "@/components/ui/form";
 
 import type { Variable, Category } from "@/lib/types/discord";
-import type { Role, Channel } from "@/components/ui/mention/mention-popover";
 import { MessageField } from "./message-field";
-import { MentionTextarea } from "@/components/ui/mention/mention-textarea";
-// Default variables
-const defaultVariables: Variable[] = [
-	{
-		id: "user",
-		name: "user",
-		category: "mention",
-	},
-	{
-		id: "username",
-		name: "username",
-		category: "mention",
-	},
-	{
-		id: "server",
-		name: "server",
-		category: "mention",
-	},
-	{
-		id: "server_name",
-		name: "server_name",
-		category: "mention",
-	},
-	{
-		id: "server_image",
-		name: "server_image",
-		category: "mention",
-	},
-	{
-		id: "avatar",
-		name: "avatar",
-		category: "mention",
-	},
-];
-
-// Default categories
-const defaultCategories: Category[] = [
-	{
-		id: "mention",
-		name: "Mentions",
-		icon: "💬",
-	},
-];
 
 // Simple ID generation function
 function generateId(): string {
@@ -89,7 +46,10 @@ interface EmbedFieldsEditorProps {
 	label: string;
 	description?: string;
 	id?: string;
+	hasPremium?: boolean;
 }
+
+const MAX_FREE_FIELDS = 5;
 
 /**
  * Component for rendering the embed field editor
@@ -99,8 +59,9 @@ export function EmbedFieldsEditor({
 	label,
 	description,
 	id = "embed-fields-editor",
+	hasPremium = false,
 }: EmbedFieldsEditorProps) {
-	const { control, getValues, setValue, register } = useFormContext();
+	const { getValues, setValue } = useFormContext();
 	const [fields, setFields] = useState<EmbedField[]>([]);
 
 	// Ref do przechowywania ostatnich wartości pól
@@ -138,6 +99,13 @@ export function EmbedFieldsEditor({
 
 	// Funkcja do dodawania nowego pola
 	const addField = useCallback(() => {
+		if (!hasPremium && fields.length >= MAX_FREE_FIELDS) {
+			toast.error("Field limit reached", {
+				description: "Upgrade to premium to add more than 5 fields.",
+			});
+			return;
+		}
+
 		const newField: EmbedField = {
 			name: "",
 			value: "",
@@ -150,7 +118,7 @@ export function EmbedFieldsEditor({
 
 		// Aktualizuj lastFieldsRef
 		lastFieldsRef.current = [...updatedFields];
-	}, [fields, name, setValue]);
+	}, [fields, name, setValue, hasPremium]);
 
 	// Funkcja do usuwania pola
 	const removeField = useCallback(
@@ -179,6 +147,11 @@ export function EmbedFieldsEditor({
 			<div>
 				<FormLabel>{label}</FormLabel>
 				{description && <FormDescription>{description}</FormDescription>}
+				<FormDescription className="mt-1">
+					{hasPremium
+						? "Premium: Unlimited fields available"
+						: `Free: ${fields.length}/${MAX_FREE_FIELDS} fields used`}
+				</FormDescription>
 			</div>
 
 			<div className="space-y-4">
@@ -249,9 +222,11 @@ export function EmbedFieldsEditor({
 					size="sm"
 					className="mt-2"
 					onClick={addField}
+					disabled={!hasPremium && fields.length >= MAX_FREE_FIELDS}
 				>
 					<PlusIcon className="mr-2 h-4 w-4" />
-					Add Field
+					Add Field{" "}
+					{!hasPremium && fields.length >= MAX_FREE_FIELDS && "(Premium Only)"}
 				</Button>
 			</div>
 		</div>

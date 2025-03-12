@@ -258,8 +258,6 @@ export function LevelsForm({ plugin }: LevelsFormProps) {
 											variables={variables}
 											categories={categories}
 											placeholder="Congratulations {user}, you've reached level {level}!"
-											roles={guildData?.roles || []}
-											channels={guildData?.channels || []}
 											maxLength={500}
 											rows={3}
 											showEmojiPicker={false}

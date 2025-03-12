@@ -60,7 +60,7 @@ export function MessageField({
 	);
 
 	// Ref do przechowywania ostatniej wartości pola
-	const lastValueRef = useRef<string | undefined>();
+	const lastValueRef = useRef<string | undefined>(undefined);
 
 	// Pobierz aktualną wartość pola
 	const fieldValue = form.watch(name);

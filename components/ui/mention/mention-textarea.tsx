@@ -677,28 +677,35 @@ export function MentionTextarea({
 				initialValue={initialValue as Descendant[]}
 				onChange={handleEditorChange}
 			>
-				<Editable
-					className={editorClasses}
-					style={{ ...style, minHeight: computeMinHeight }}
-					placeholder={placeholder}
-					autoCorrect="off"
-					spellCheck
-					onKeyDown={handleKeyDown}
-					onMouseDown={handleMouseDown}
-					renderPlaceholder={({ children, attributes }) => (
-						<CustomPlaceholder attributes={attributes}>
-							{children}
-						</CustomPlaceholder>
+				<div className="relative">
+					<Editable
+						className={editorClasses}
+						style={{ ...style, minHeight: computeMinHeight }}
+						placeholder={placeholder}
+						autoCorrect="off"
+						spellCheck
+						onKeyDown={handleKeyDown}
+						onMouseDown={handleMouseDown}
+						renderPlaceholder={({ children, attributes }) => (
+							<CustomPlaceholder attributes={attributes}>
+								{children}
+							</CustomPlaceholder>
+						)}
+						renderElement={(props) => (
+							<MentionElementRenderer
+								{...props}
+								element={props.element as unknown as RenderElement}
+								roles={roles}
+								channels={channels}
+							/>
+						)}
+					/>
+					{maxLength && (
+						<div className="z-10 absolute bottom-1 right-2 text-xs text-muted-foreground select-none">
+							{value.length}/{maxLength}
+						</div>
 					)}
-					renderElement={(props) => (
-						<MentionElementRenderer
-							{...props}
-							element={props.element as unknown as RenderElement}
-							roles={roles}
-							channels={channels}
-						/>
-					)}
-				/>
+				</div>
 			</Slate>
 
 			{mentionPopover && (
