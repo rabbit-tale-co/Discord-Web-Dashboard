@@ -1,19 +1,53 @@
-import type * as React from "react";
+import type React from "react";
 
-import { cn } from "@/lib/utils";
+import { withVariants } from "@udecode/cn";
+import { type VariantProps, cva } from "class-variance-authority";
 
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+export const inputVariants = cva(
+	"border-input file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground aria-invalid:outline-destructive/60 aria-invalid:ring-destructive/20 dark:aria-invalid:outline-destructive dark:aria-invalid:ring-destructive/50 ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 aria-invalid:outline-destructive/60 dark:aria-invalid:outline-destructive dark:aria-invalid:ring-destructive/40 aria-invalid:ring-destructive/20 aria-invalid:border-destructive/60 dark:aria-invalid:border-destructive flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-4 focus-visible:outline-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:focus-visible:ring-[3px] aria-invalid:focus-visible:outline-none md:text-sm dark:aria-invalid:focus-visible:ring-4",
+	{
+		defaultVariants: {
+			h: "md",
+			variant: "default",
+		},
+		variants: {
+			h: {
+				md: "h-10 px-3 py-2",
+				sm: "h-[28px] px-1.5 py-1",
+			},
+			variant: {
+				default:
+					"border border-input ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+				ghost: "border-none focus-visible:ring-transparent",
+			},
+		},
+	},
+);
+
+export type InputProps = React.ComponentPropsWithoutRef<"input"> &
+	VariantProps<typeof inputVariants>;
+
+export const Input = withVariants("input", inputVariants, ["variant", "h"]);
+
+export type FloatingInputProps = InputProps & {
+	label: string;
+};
+
+export function FloatingInput({
+	id,
+	className,
+	label,
+	...props
+}: FloatingInputProps) {
 	return (
-		<input
-			type={type}
-			data-slot="input"
-			className={cn(
-				"border-input file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground aria-invalid:outline-destructive/60 aria-invalid:ring-destructive/20 dark:aria-invalid:outline-destructive dark:aria-invalid:ring-destructive/50 ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 aria-invalid:outline-destructive/60 dark:aria-invalid:outline-destructive dark:aria-invalid:ring-destructive/40 aria-invalid:ring-destructive/20 aria-invalid:border-destructive/60 dark:aria-invalid:border-destructive flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-4 focus-visible:outline-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:focus-visible:ring-[3px] aria-invalid:focus-visible:outline-none md:text-sm dark:aria-invalid:focus-visible:ring-4",
-				className,
-			)}
-			{...props}
-		/>
+		<>
+			<label
+				className="absolute top-1/2 block -translate-y-1/2 cursor-text px-1 text-sm text-muted-foreground/70 transition-all group-focus-within:pointer-events-none group-focus-within:top-0 group-focus-within:cursor-default group-focus-within:text-xs group-focus-within:font-medium group-focus-within:text-foreground has-[+input:not(:placeholder-shown)]:pointer-events-none has-[+input:not(:placeholder-shown)]:top-0 has-[+input:not(:placeholder-shown)]:cursor-default has-[+input:not(:placeholder-shown)]:text-xs has-[+input:not(:placeholder-shown)]:font-medium has-[+input:not(:placeholder-shown)]:text-foreground"
+				htmlFor={id}
+			>
+				<span className="inline-flex bg-background px-2">{label}</span>
+			</label>
+			<Input id={id} className={className} placeholder="" {...props} />
+		</>
 	);
 }
-
-export { Input };

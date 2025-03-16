@@ -29,6 +29,15 @@
       "@/*": [
         "./*"
       ],
+      "@/editor/*": [
+        "./components/editor/*"
+      ],
+      "@/plugins/*": [
+        "./components/editor/plugins/*"
+      ],
+      "@/plate/*": [
+        "./components/plate-ui/*"
+      ],
       "@/components/*": [
         "./components/*"
       ]
@@ -43,5 +52,4 @@
   "exclude": [
     "node_modules"
   ]
-
 }
