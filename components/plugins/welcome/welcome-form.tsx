@@ -75,6 +75,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ImageIcon } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { TestMentionField } from "@/components/ui/mention/test-mention-textarea";
 
 // Define interfaces for our types
 interface EmbedField {
@@ -1019,11 +1020,10 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 						value="welcome-message"
 						className="space-y-4 mt-4"
 					>
-						<MessageField
+						<TestMentionField
 							name="welcome_message"
 							label="Welcome Message"
 							description="Message that will be sent to users when they join the server"
-							showEmojiPicker={false}
 							rows={3}
 							maxLength={1000}
 							id="welcome-message-field"
@@ -1072,30 +1072,50 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 											)}
 										/>
 
-										<MessageField
+										<FormField
+											control={form.control}
 											name="embed_welcome.title"
-											label="Title"
-											// description="The title of your welcome embed"
-											showEmojiPicker={false}
-											rows={1}
-											maxLength={100}
-											id="welcome-embed-title-field"
+											render={({ field }) => (
+												<FormItem>
+													<FormLabel>Title</FormLabel>
+													<FormControl>
+														<MessageField
+															name="embed_welcome.title"
+															placeholder="Welcome to {server}!"
+															maxLength={100}
+															rows={1}
+															singleLine
+															id="welcome-embed-title-field"
+														/>
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
 										/>
 
-										<MessageField
+										<FormField
+											control={form.control}
 											name="embed_welcome.description"
-											label="Description"
-											// description="The main content of your welcome embed"
-											showEmojiPicker={false}
-											rows={4}
-											maxLength={500}
-											id="welcome-embed-description-field"
+											render={({ field }) => (
+												<FormItem>
+													<FormLabel>Description</FormLabel>
+													<FormControl>
+														<MessageField
+															name="embed_welcome.description"
+															placeholder="Welcome {user} to our server!"
+															maxLength={500}
+															rows={4}
+															id="welcome-embed-description-field"
+														/>
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
 										/>
 
 										<EmbedFieldsEditor
 											name="embed_welcome.fields"
 											label="Fields"
-											// description="Add fields to your welcome embed"
 											id="welcome-embed-fields"
 										/>
 
@@ -1123,10 +1143,10 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 										<MessageField
 											name="embed_welcome.footer.text"
 											label="Footer"
-											// description="Text that appears at the bottom of the welcome embed"
-											showEmojiPicker={false}
-											singleLine
+											placeholder="Joined at {timestamp}"
 											maxLength={100}
+											rows={1}
+											singleLine
 											id="welcome-embed-footer-field"
 										/>
 									</div>
@@ -1250,51 +1270,30 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 											)}
 										/>
 
-										<FormField
-											control={form.control}
+										<MessageField
 											name="embed_leave.title"
-											render={({ field }) => (
-												<FormItem>
-													<FormLabel>Title</FormLabel>
-													<FormControl>
-														<MentionTextarea
-															value={field.value || ""}
-															onChange={field.onChange}
-															variables={variables}
-															categories={categories}
-															placeholder="Goodbye from {server}!"
-															maxLength={100}
-															rows={1}
-															singleLine={false}
-															id="leave-embed-title-field"
-														/>
-													</FormControl>
-													<FormMessage />
-												</FormItem>
-											)}
+											placeholder="Goodbye from {server}!"
+											maxLength={100}
+											rows={1}
+											singleLine
+											id="leave-embed-title-field"
 										/>
 
-										<FormField
-											control={form.control}
+										<MessageField
 											name="embed_leave.description"
-											render={({ field }) => (
-												<FormItem>
-													<FormLabel>Description</FormLabel>
-													<FormControl>
-														<MentionTextarea
-															value={field.value || ""}
-															onChange={field.onChange}
-															variables={variables}
-															categories={categories}
-															placeholder="We're sad to see you go!"
-															maxLength={500}
-															rows={4}
-															id="leave-embed-description-field"
-														/>
-													</FormControl>
-													<FormMessage />
-												</FormItem>
-											)}
+											placeholder="We're sad to see you go!"
+											maxLength={500}
+											rows={4}
+											id="leave-embed-description-field"
+										/>
+
+										<MessageField
+											name="embed_leave.footer.text"
+											placeholder="Left at {timestamp}"
+											maxLength={100}
+											rows={1}
+											singleLine
+											id="leave-embed-footer-field"
 										/>
 
 										<EmbedFieldsEditor
@@ -1324,27 +1323,13 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 											)}
 										/>
 
-										<FormField
-											control={form.control}
+										<MessageField
 											name="embed_leave.footer.text"
-											render={({ field }) => (
-												<FormItem>
-													<FormLabel>Footer</FormLabel>
-													<FormControl>
-														<MentionTextarea
-															value={field.value || ""}
-															onChange={field.onChange}
-															variables={variables}
-															categories={categories}
-															placeholder="Come back soon!"
-															maxLength={100}
-															singleLine
-															id="leave-embed-footer-field"
-														/>
-													</FormControl>
-													<FormMessage />
-												</FormItem>
-											)}
+											placeholder="Left at {timestamp}"
+											maxLength={100}
+											rows={1}
+											singleLine
+											id="leave-embed-footer-field"
 										/>
 									</div>
 									<div className="flex-shrink-0 w-20 self-start">

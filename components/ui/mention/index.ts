@@ -29,6 +29,7 @@ export {
 
 // Export core components
 export { MentionTextarea } from "./mention-textarea";
+export { TestMentionTextarea } from "./test-mention-textarea";
 export { EmojiPicker } from "./emoji-picker";
 
 // Re-export from the formatter hook

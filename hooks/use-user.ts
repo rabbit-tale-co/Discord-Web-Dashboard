@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, use } from "react";
 import type * as Discord from "discord.js";
 import { clearCache, getCachedData, setCachedData } from "@/lib/cache";
 
@@ -128,12 +128,17 @@ export function useMe() {
 		pathname.startsWith(path),
 	);
 
-	const isLoggedIn = useMemo(() => {
-		const cached = getCachedData<Discord.User>("user");
-		if (cached?.data?.id) {
-			return cached.data;
-		}
-		return null;
+	const isLoggedIn = useEffect(() => {
+		const checkLogin = async () => {
+			const apiResponse = await fetch("/api/auth/me");
+			if (apiResponse.ok) {
+				setUserData(await apiResponse.json());
+				setStatus("success");
+			} else {
+				setStatus("error");
+			}
+		};
+		checkLogin();
 	}, []);
 
 	useEffect(() => {
@@ -148,17 +153,10 @@ export function useMe() {
 	}, []);
 
 	useEffect(() => {
-		if (isProtectedPath && !userData && !isLoggedIn) {
+		if (isProtectedPath && !userData) {
 			router.push("/");
 		}
-	}, [isProtectedPath, router, userData, isLoggedIn]);
-
-	useEffect(() => {
-		if (isLoggedIn) {
-			setUserData(isLoggedIn);
-			setStatus("success");
-		}
-	}, [isLoggedIn]);
+	}, [isProtectedPath, router, userData]);
 
 	const loginFn = async () => {
 		return new Promise<void>((resolve) => {

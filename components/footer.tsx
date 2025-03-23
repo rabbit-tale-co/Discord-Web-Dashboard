@@ -26,11 +26,40 @@ export function Footer() {
 		useState<StatusResponse["healthStatus"]["bot_status"]>("disabled");
 
 	useEffect(() => {
-		fetch("/api/status")
-			.then((res) => res.json())
-			.then((data) => {
-				setBotStatus(data.healthStatus.bot_status);
-			});
+		const fetchStatus = async () => {
+			try {
+				const response = await fetch("/api/status");
+
+				if (!response.ok) {
+					console.error("Status API returned an error:", response.status);
+					setBotStatus("not_working");
+					return;
+				}
+
+				const data = await response.json();
+
+				if (data?.healthStatus?.bot_status) {
+					setBotStatus(data.healthStatus.bot_status);
+				} else {
+					console.warn(
+						"Missing expected data structure in API response:",
+						data,
+					);
+					setBotStatus("disabled");
+				}
+			} catch (error) {
+				console.error("Error fetching bot status:", error);
+				setBotStatus("not_working");
+			}
+		};
+
+		fetchStatus();
+
+		// Set up interval to refresh status every 30 seconds
+		const intervalId = setInterval(fetchStatus, 30000);
+
+		// Clean up interval on component unmount
+		return () => clearInterval(intervalId);
 	}, []);
 
 	const companyLinks = [
