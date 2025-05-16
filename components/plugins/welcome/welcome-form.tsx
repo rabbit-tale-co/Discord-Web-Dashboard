@@ -36,7 +36,6 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { MentionTextarea } from "@/components/ui/mention/mention-textarea";
 import { type GuildData, useGuild } from "@/hooks/use-guilds";
 import { combineCategories, combineVariables } from "@/lib/variables";
 import { useParams, useRouter } from "next/navigation";
@@ -76,6 +75,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ImageIcon } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { TestMentionField } from "@/components/ui/mention/test-mention-textarea";
+import { MentionField } from "@/components/ui/mention/mention-field";
 
 // Define interfaces for our types
 interface EmbedField {
@@ -1020,7 +1020,7 @@ export function WelcomeForm({ plugin }: WelcomeFormProps) {
 						value="welcome-message"
 						className="space-y-4 mt-4"
 					>
-						<TestMentionField
+						<MentionField
 							name="welcome_message"
 							label="Welcome Message"
 							description="Message that will be sent to users when they join the server"

@@ -57,7 +57,7 @@ export default function Hero() {
 					<Counter />
 				</div>
 				{/* Right side */}
-				<div className="relative w-full lg:w-[450px] p-1 rounded-3xl bg-primary lg:h-full h-86">
+				<div className="relative w-full lg:w-[450px] p-2 rounded-4xl bg-primary lg:h-full h-86">
 					<OptimizedDiscordDisplay />
 				</div>
 			</div>
@@ -140,7 +140,7 @@ const AvatarGroup = ({ avatarSrc }: { avatarSrc: string }) => (
 );
 
 const OptimizedDiscordDisplay = () => (
-	<div className="flex items-center bg-secondary rounded-[20px] squarcle-mask justify-center overflow-hidden h-full">
+	<div className="flex items-center bg-secondary rounded-[calc(32px-8px)] squarcle-mask justify-center overflow-hidden h-full">
 		<div className="relative z-10 w-full h-full group">
 			<DiscordIcon />
 			<LogoIcon />

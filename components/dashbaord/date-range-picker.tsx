@@ -17,7 +17,10 @@ import { CalendarIcon } from "lucide-react";
 
 export function CalendarDateRangePicker({
 	className,
-}: React.HTMLAttributes<HTMLDivElement>) {
+	iconOnly = false,
+}: React.HTMLAttributes<HTMLDivElement> & {
+	iconOnly?: boolean;
+}) {
 	const [date, setDate] = React.useState<DateRange | undefined>({
 		from: new Date(),
 		to: addDays(new Date(), 20),
@@ -29,25 +32,30 @@ export function CalendarDateRangePicker({
 				<PopoverTrigger asChild>
 					<Button
 						id="date"
-						variant={"outline"}
-						size={"lg"}
+						variant={"secondary"}
+						size={iconOnly ? "iconLg" : "lg"}
 						className={cn(
 							"justify-start text-left font-normal text-primary",
 							!date && "text-muted-foreground",
 						)}
 					>
-						<CalendarIcon className="mr-2 h-4 w-4" />
-						{date?.from ? (
-							date.to ? (
-								<React.Fragment>
-									{format(date.from, "LLL dd, y")} -{" "}
-									{format(date.to, "LLL dd, y")}
-								</React.Fragment>
-							) : (
-								format(date.from, "LLL dd, y")
-							)
+						{iconOnly ? (
+							<CalendarIcon className="mr-2" size={22} />
 						) : (
-							<span>Pick a date</span>
+							<React.Fragment>
+								{date?.from ? (
+									date.to ? (
+										<React.Fragment>
+											{format(date.from, "LLL dd, y")} -{" "}
+											{format(date.to, "LLL dd, y")}
+										</React.Fragment>
+									) : (
+										format(date.from, "LLL dd, y")
+									)
+								) : (
+									<span>Pick a date</span>
+								)}
+							</React.Fragment>
 						)}
 					</Button>
 				</PopoverTrigger>

@@ -48,7 +48,7 @@ export function DashboardSidebar({
 					/>
 				)}
 			</SidebarContent>
-			<SidebarFooter>{user && <NavUser user={user} />}</SidebarFooter>
+			{/* <SidebarFooter>{user && <NavUser user={user} />}</SidebarFooter> */}
 			<SidebarRail />
 		</Sidebar>
 	);

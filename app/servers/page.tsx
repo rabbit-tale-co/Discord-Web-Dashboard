@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "../../context/authContext";
 import Image from "next/image";
 import Link from "next/link";
 import React from "react";
@@ -63,12 +61,12 @@ export default function Servers() {
 										// 🔹 Server Card with Nested Grid
 										<div
 											key={guild.id}
-											className="group relative overflow-hidden rounded-3xl bg-primary transition-all duration-300 p-1"
+											className="group relative overflow-hidden rounded-4xl bg-primary transition-all duration-300 p-2"
 										>
 											{/* Inner Grid Layout */}
 											<div className="flex flex-col gap-2">
 												{/* 🔹 Image Container */}
-												<div className="relative w-full aspect-video overflow-hidden rounded-[20px]">
+												<div className="relative w-full aspect-square overflow-hidden rounded-3xl">
 													<Image
 														src={avatarUrl(
 															guild.id,
@@ -78,10 +76,13 @@ export default function Servers() {
 														)}
 														alt={guild.name}
 														width={900}
-														height={600}
+														height={900}
 														className="h-full w-full object-cover object-center transition-transform duration-300 sm:group-hover:scale-105"
 													/>
+													{/* TOP GRADIENT */}
 													<div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-transparent" />
+													{/* BOTTOM GRADIENT */}
+													<div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 													{guild.premium_tier > 0 && (
 														<Button
 															variant={"outline"}
@@ -91,11 +92,48 @@ export default function Servers() {
 															<Icon.OutlineCrown size={20} />
 														</Button>
 													)}
+
+													<div className="absolute bottom-0 left-0 right-0 flex gap-2 justify-between items-end pr-2 pb-2">
+														<div className="flex flex-col items-start max-w-[50%] pl-3">
+															<h3 className="text-lg truncate font-semibold text-white w-full">
+																{guild.name}
+															</h3>
+															<p className="text-sm text-white/75 font-medium">
+																{(
+																	guild.approximate_member_count || 0
+																).toLocaleString()}{" "}
+																members
+															</p>
+														</div>
+
+														{/* 🔹 Button Section */}
+														<Button
+															variant={!guild.has_bot ? "discord" : "dimmed"}
+															size={"lg"}
+															asChild
+														>
+															<Link
+																href={
+																	!guild.has_bot
+																		? `https://discord.com/api/oauth2/authorize?client_id=${process.env.NEXT_PUBLIC_BOT_ID}&permissions=8&scope=bot%20applications.commands&guild_id=${guild.id}`
+																		: `/dashboard/${guild.id}`
+																}
+																target={!guild.has_bot ? "_blank" : undefined}
+															>
+																{!guild.has_bot ? "Add to Server" : "Configure"}
+																{!guild.has_bot ? (
+																	<Icon.SolidDiscord />
+																) : (
+																	<Icon.SolidArrowRight />
+																)}
+															</Link>
+														</Button>
+													</div>
 												</div>
 
 												{/* 🔹 Server Information */}
 
-												<div className="flex gap-2 justify-between items-end pr-2 pb-2">
+												{/* <div className="flex gap-2 justify-between items-end pr-2 pb-2">
 													<div className="flex flex-col items-start max-w-[50%] pl-3">
 														<h3 className="text-lg truncate font-semibold text-white w-full">
 															{guild.name}
@@ -107,8 +145,6 @@ export default function Servers() {
 															members
 														</p>
 													</div>
-
-													{/* 🔹 Button Section */}
 													<Button
 														variant={!guild.has_bot ? "discord" : "secondary"}
 														size={"lg"}
@@ -130,7 +166,7 @@ export default function Servers() {
 															)}
 														</Link>
 													</Button>
-												</div>
+												</div> */}
 											</div>
 										</div>
 									))}
